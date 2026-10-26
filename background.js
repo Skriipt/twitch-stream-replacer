@@ -1,5 +1,6 @@
 import "./config.js";
 import { discoverLiveStream } from "./resolver.js";
+import { detectSubscription } from "./subscriber.js";
 
 const CONFIG = globalThis.StylerzBridgeConfig;
 const cached = new Map();
@@ -8,6 +9,28 @@ let ruleQueue = Promise.resolve();
 
 function isChannel(url) {
   return Boolean(CONFIG.channelForUrl(url));
+}
+
+async function subscription(tabId, expectedLogin) {
+  const tab = await chrome.tabs.get(tabId);
+  const channel = CONFIG.channelForUrl(tab.url);
+  if (!channel || channel.twitchLogin !== expectedLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
+  let result;
+  try {
+    const frames = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] }, world: "MAIN",
+      func: detectSubscription, args: [expectedLogin],
+    });
+    result = frames.find((frame) => frame.frameId === 0)?.result;
+  } catch {
+    // A missing page, changed Twitch implementation or injection failure is
+    // never evidence that the viewer has no subscription.
+  }
+  const currentTab = await chrome.tabs.get(tabId);
+  if (CONFIG.channelForUrl(currentTab.url)?.twitchLogin !== expectedLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
+  const state = result?.twitchLogin === expectedLogin &&
+    ["subscribed", "not-subscribed"].includes(result.state) ? result.state : "unknown";
+  return { state, twitchLogin: expectedLogin, checkedAt: Date.now() };
 }
 
 async function lookup(channel, force = false, links = []) {
@@ -42,6 +65,11 @@ function setSuspended(tabId, suspended, expectedLogin) {
       const tab = await chrome.tabs.get(tabId);
       const channel = CONFIG.channelForUrl(tab.url);
       if (!channel || channel.twitchLogin !== expectedLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
+      // Enforce this in the serialized operation, immediately before blocking
+      // media. A stale content-script result must never bypass the guard.
+      const viewer = await subscription(tabId, expectedLogin);
+      if (viewer.state === "subscribed") throw new Error("Aktives Kanal-Abo erkannt. Twitch läuft weiter.");
+      if (viewer.state !== "not-subscribed") throw new Error("Abo-Status noch unklar. Twitch läuft weiter; bitte erneut prüfen.");
       const used = new Set(rules.filter((rule) => !removeRuleIds.includes(rule.id)).map((rule) => rule.id));
       let id = 1;
       while (used.has(id)) id += 1;
@@ -71,6 +99,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (!channel || channel.twitchLogin !== message.twitchLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
       return lookup(channel, message.force === true, message.youtubeLinks);
     }
+    if (message?.type === "SUBSCRIPTION") return subscription(sender.tab.id, message.twitchLogin);
     if (message?.type === "SUSPEND") {
       await setSuspended(sender.tab.id, true, message.twitchLogin);
       return { state: "suspended" };

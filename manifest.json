@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "description": "YouTube-Livestreams über Twitch-Profillinks finden, auf Twitch ansehen und den Chat behalten. Nutzt den normalen YouTube-Player.",
   "minimum_chrome_version": "120",
-  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "permissions": ["declarativeNetRequestWithHostAccess", "scripting"],
   "host_permissions": [
     "https://www.twitch.tv/*",
     "https://www.youtube.com/*",
