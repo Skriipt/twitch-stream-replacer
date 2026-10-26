@@ -7,6 +7,10 @@
 5. Eine Twitch-Kanalseite öffnen oder neu laden. Im Videobereich erscheint der kanalbezogene **Stream Bridge**-Umschalter. Das Add-on sucht im geladenen Profil und in den Infopanels nach verlinkten YouTube-Kanälen. Falls keine Links gefunden werden, den **Info-/About-Bereich** des Kanals öffnen; nachgeladene Links werden automatisch geprüft.
 6. Wenn der ausgewählte Streamer auf YouTube live ist, **YouTube ansehen** klicken. Falls nötig anschließend im Player auf Play klicken. Der Twitch-Chat bleibt auf der Seite. YouTube nutzt die gesamte ursprüngliche Playerfläche.
 
+Über das Erweiterungsicon in der Browserleiste öffnest du das externe Menü. Dort lässt sich **Automatisch zu YouTube** ein- und ausschalten. Die Einstellung ist anfangs aus, wird lokal im Browserprofil gespeichert und gilt auch für bereits geöffnete Twitch-Tabs. Bei eingeschalteter Automatik öffnet das Add-on einen eindeutig erkannten, öffentlichen YouTube-Livestream selbstständig. Ausschalten beendet einen bereits geöffneten YouTube-Player nicht; weitere Wechsel erfolgen wieder manuell. Eine regelmäßige Hintergrundabfrage kommt dadurch nicht hinzu.
+
+Der Abo-Schutz gilt auch für die Automatik: Bei einem aktiven oder noch unklaren Kanal-Abo bleibt Twitch aktiv. Erst wenn Twitch bestätigt, dass kein Kanal-Abo besteht, ist ein Wechsel möglich.
+
 Während der YouTube-Wiedergabe ersetzt ein kleiner **⋯-Knopf oben rechts** den bisherigen Banner. Darüber sind **Zurück zu Twitch**, **Auf YouTube öffnen** und **YouTube-Konto & Premium** erreichbar. Das Menü liegt über dem Video und verkleinert es nicht. Mit **×**, **Escape** oder einem Klick in den Chat lässt es sich schließen.
 
 Twitchs kleine Vorschau über dem Chat, die bei Werbepausen erscheinen kann, wird im YouTube-Modus ausgeblendet und ihr Platz freigegeben. Beim Verlassen des YouTube-Modus gilt wieder Twitchs eigener Zustand.
@@ -29,6 +33,8 @@ YouTube beschreibt diese Voraussetzung in seiner offiziellen Hilfe: https://supp
 
 **Zurück zu Twitch ↻** hebt die temporäre Videosperre auf und lädt Twitch neu. Ungesendeter Chattext kann beim Neuladen verloren gehen.
 
+Auch bei eingeschalteter Automatik bleibt dieser Kanal danach im selben Tab auf Twitch, einschließlich weiterer Neuladungen. Andere Kanäle und Tabs nutzen weiterhin die Automatik. Schalte die Automatik im externen Menü aus und wieder ein, um den automatischen Wechsel auch für diesen Kanal im Tab erneut zu erlauben. Beim Schließen des Tabs wird diese Ausnahme gelöscht.
+
 ## Umfang
 
 - Automatische Zuordnung über YouTube-Kanallinks im geladenen Twitch-Profil: `@Handle`, `/channel/UC…`, `/c/Name`, `/user/Name` und ältere direkte Kanalnamen. Keine Namenssuche, Link-Aggregatoren oder einzelnen Videolinks. Chatlinks und Empfehlungen zählen nicht als Kanalzuordnung.
@@ -42,6 +48,6 @@ YouTube beschreibt diese Voraussetzung in seiner offiziellen Hilfe: https://supp
 - Kein Werbeblocker. Werbung/Sponsoring im eigentlichen Stream bleibt sichtbar.
 - Kein Backend, keine Telemetrie, keine Zugangsdaten im Add-on, keine dauernde Hintergrundabfrage.
 
-Die Erweiterung benötigt Zugriff auf Twitch für den Umschalter, auf YouTube für die Stream-Erkennung und auf `*.ttvnw.net` samt temporären Chromium-Netzwerkregeln, um Twitch-Videodaten in diesem Tab anzuhalten. Der Browser darf für die Kanalabfrage seine vorhandene YouTube-Sitzung mitsenden. Ausgewertet werden nur Kanal- und Stream-Metadaten. Keine Cookie-Berechtigung und kein Auslesen von Passwörtern oder Tokens.
+Die Erweiterung benötigt Zugriff auf Twitch für den Umschalter, auf YouTube für die Stream-Erkennung und auf `*.ttvnw.net` samt temporären Chromium-Netzwerkregeln, um Twitch-Videodaten in diesem Tab anzuhalten. Die Berechtigung `storage` speichert den Automatik-Schalter lokal sowie die Rückkehr zu Twitch je Tab für die Browsersitzung. Der Browser darf für die Kanalabfrage seine vorhandene YouTube-Sitzung mitsenden. Ausgewertet werden nur Kanal- und Stream-Metadaten. Keine Cookie-Berechtigung und kein Auslesen von Passwörtern oder Tokens.
 
 Ein unabhängiger, lokal installierter Prototyp; keine Verbindung zu Twitch, YouTube oder den Streamern.

@@ -8,7 +8,15 @@ async function worker() {
   const listeners = {};
   const tabs = new Map([[1, { url: "https://www.twitch.tv/creator" }], [2, { url: "https://www.twitch.tv/second" }]]);
   let rules = [];
+  const local = {};
+  const session = {};
+  const storageArea = (values) => ({
+    get: async (keys) => typeof keys === "string" ? { [keys]: values[keys] } : { ...keys, ...values },
+    set: async (updates) => { Object.assign(values, updates); },
+    remove: async (key) => { delete values[key]; },
+  });
   globalThis.chrome = {
+    storage: { local: storageArea(local), session: storageArea(session) },
     runtime: { id: "test-extension", onMessage: { addListener: (fn) => { listeners.message = fn; } } },
     tabs: { get: async (id) => tabs.get(id), sendMessage: async () => {},
       onUpdated: { addListener: (fn) => { listeners.updated = fn; } }, onRemoved: { addListener: (fn) => { listeners.removed = fn; } } },
@@ -21,7 +29,7 @@ async function worker() {
   await import(`../background.js?test=${crypto.randomUUID()}`);
   const sender = (tabId = 1) => ({ id: "test-extension", frameId: 0, tab: { id: tabId }, url: tabs.get(tabId).url });
   const message = (fields, tabId = 1) => new Promise((resolve) => listeners.message(fields, sender(tabId), resolve));
-  return { message, sender, listeners, tabs, rules: () => rules };
+  return { message, sender, listeners, tabs, local, session, rules: () => rules };
 }
 
 test("lookup is scoped to current tab login and profile-link set; force refresh bypasses cache", async () => {
@@ -83,4 +91,25 @@ test("tab reload clears suspension even on the same channel", async () => {
   app.listeners.updated(1, { status: "loading" });
   await app.message({ type: "RESUME" }); // queued behind the navigation cleanup
   assert.equal(app.rules().length, 0);
+});
+
+test("automatic suspension requires opt-in and respects per-tab Twitch overrides", async () => {
+  const app = await worker();
+  const automatic = { type: "SUSPEND", twitchLogin: "creator", automatic: true };
+  assert.equal((await app.message(automatic)).result.state, "cancelled");
+  assert.equal(app.rules().length, 0);
+  Object.assign(app.local, { autoSwitchToYouTube: true, autoSwitchRevision: "first" });
+  assert.equal((await app.message(automatic)).result.state, "suspended");
+  await app.message({ type: "RESUME", twitchLogin: "creator", keepTwitch: true });
+  assert.equal(app.rules().length, 0);
+  assert.equal((await app.message(automatic)).result.state, "cancelled");
+  assert.equal((await app.message({ ...automatic, twitchLogin: "second" }, 2)).result.state, "suspended");
+  app.local.autoSwitchRevision = "second";
+  assert.equal((await app.message(automatic)).result.state, "suspended");
+  app.local.autoSwitchToYouTube = false;
+  await app.message({ type: "RESUME" });
+  assert.equal((await app.message(automatic)).result.state, "cancelled");
+  assert.equal((await app.message({ ...automatic, automatic: false })).result.state, "suspended", "manual playback still works");
+  app.listeners.removed(1);
+  assert.equal(app.session["twitchOverride:1"], undefined);
 });

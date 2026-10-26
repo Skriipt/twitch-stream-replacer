@@ -59,8 +59,22 @@ async function addLinks(page, urls = [profileUrl]) {
 }
 async function close(page) { pages.delete(page); await page.close(); }
 async function sessionRules() { return worker.evaluate(() => chrome.declarativeNetRequest.getSessionRules()); }
+async function openPopup() {
+  const page = await context.newPage();
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+  await expect(page.getByRole("switch", { name: "Automatisch zu YouTube", exact: true })).toBeEnabled();
+  return page;
+}
+async function setAutomatic(popup, enabled) {
+  const toggle = popup.getByRole("switch", { name: "Automatisch zu YouTube", exact: true });
+  await toggle.setChecked(enabled);
+  await expect(toggle).toBeEnabled();
+  await expect(popup.getByRole("status")).toContainText(enabled ? "Ein ·" : "Aus ·");
+}
 
 before(async () => {
+  if (process.env.STREAM_BRIDGE_ARTIFACTS) await mkdir(process.env.STREAM_BRIDGE_ARTIFACTS, { recursive: true });
   context = await chromium.launchPersistentContext("", {
     channel: "chromium", headless: true,
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
@@ -70,7 +84,7 @@ before(async () => {
   await context.route("https://www.twitch.tv/**", (route) => route.fulfill({ contentType: "text/html", body: fixture(new URL(route.request().url()).pathname.split("/")[1]) }));
   await context.route("https://www.youtube.com/embed/**", (route) => route.fulfill({ contentType: "text/html", body: "<html><body style='margin:0;background:black;color:white'>YouTube embed fixture</body></html>" }));
 });
-after(async () => { await context?.close(); });
+after(async () => { await context?.close(); assert.deepEqual(errors, []); });
 
 test("loaded extension discovers late profile links, switches video and preserves chat; compact UI and menu work", async () => {
   await mockYouTube(routes());
@@ -224,13 +238,188 @@ test("UI fits a small player and popup has no broken or hardcoded creator links"
   await expect(page.locator(`${root} details`)).toBeHidden();
   if (process.env.STREAM_BRIDGE_ARTIFACTS) await page.screenshot({ path: `${process.env.STREAM_BRIDGE_ARTIFACTS}/small-player.png` });
   await close(page);
-  const popup = await context.newPage();
-  const id = new URL(worker.url()).host;
-  await popup.goto(`chrome-extension://${id}/popup.html`);
+  const popup = await openPopup();
   await expect(popup.getByRole("heading", { name: "Stream Bridge", exact: true })).toBeVisible();
+  await expect(popup.getByRole("switch")).not.toBeChecked();
+  assert.equal(await popup.locator(".brand img").evaluate((image) => image.complete && image.naturalWidth === 48), true);
+  const iconPaths = await worker.evaluate(() => Object.values(chrome.runtime.getManifest().icons));
+  for (const path of iconPaths) {
+    assert.equal(await popup.evaluate(async (path) => {
+      const image = new Image();
+      image.src = chrome.runtime.getURL(path);
+      await image.decode();
+      return image.naturalWidth;
+    }, path), Number(/icon-(\d+)/.exec(path)[1]));
+  }
   assert.equal(await popup.locator('a[href*="twitch.tv/stylerz"], a[href*="undefined"]').count(), 0);
   assert.equal(await popup.locator("body").evaluate((body) => body.scrollWidth), 320);
-  if (process.env.STREAM_BRIDGE_ARTIFACTS) await popup.screenshot({ path: `${process.env.STREAM_BRIDGE_ARTIFACTS}/popup.png`, clip: { x: 0, y: 0, width: 320, height: 420 } });
+  if (process.env.STREAM_BRIDGE_ARTIFACTS) await popup.locator("body").screenshot({ path: `${process.env.STREAM_BRIDGE_ARTIFACTS}/popup.png` });
   await popup.close();
-  assert.deepEqual(errors, []);
+});
+
+test("popup opt-in switches existing tabs, persists across reloads and turning it off preserves active playback", async () => {
+  await mockYouTube(routes());
+  const first = await open("autofirst");
+  const second = await open("autosecond");
+  await addLinks(first);
+  await addLinks(second);
+  await expect(first.locator(`${root} #watch`)).toBeEnabled();
+  await expect(second.locator(`${root} #watch`)).toBeEnabled();
+  let popup = await openPopup();
+  await expect(popup.getByRole("switch")).not.toBeChecked();
+  await popup.getByRole("switch").press("Space");
+  await expect(popup.getByRole("status")).toContainText("Ein ·");
+  await expect(first.locator(`${root} iframe`)).toBeVisible();
+  await expect(second.locator(`${root} iframe`)).toBeVisible();
+  assert.equal((await sessionRules()).length, 2);
+  await popup.close();
+  popup = await openPopup();
+  await expect(popup.getByRole("switch")).toBeChecked();
+  await first.reload();
+  await expect(first.locator(`${root} #status`)).toContainText("Kein YouTube-Kanallink");
+  await addLinks(first);
+  await expect(first.locator(`${root} iframe`)).toBeVisible();
+  await setAutomatic(popup, false);
+  await expect(first.locator(`${root} iframe`)).toBeVisible();
+  await expect(second.locator(`${root} iframe`)).toBeVisible();
+  const manual = await open("autodisabled");
+  await addLinks(manual);
+  await expect(manual.locator(`${root} #watch`)).toBeEnabled();
+  await expect(manual.locator(`${root} iframe`)).toHaveCount(0);
+  await manual.locator(`${root} #watch`).click();
+  await expect(manual.locator(`${root} iframe`)).toBeVisible();
+  await Promise.all([close(first), close(second), close(manual), popup.close()]);
+  await expect.poll(async () => (await sessionRules()).length).toBe(0);
+});
+
+test("automatic playback respects return to Twitch and can be re-enabled in the popup", async () => {
+  await mockYouTube(routes());
+  const popup = await openPopup();
+  await setAutomatic(popup, true);
+  const page = await open("autoreturn");
+  await addLinks(page);
+  await expect(page.locator(`${root} iframe`)).toBeVisible();
+  await page.locator(`${root} #menu`).click();
+  await page.locator(`${root} #back`).click();
+  await expect(page.locator(`${root} #status`)).toContainText("Kein YouTube-Kanallink");
+  await addLinks(page);
+  await expect(page.locator(`${root} #watch`)).toBeEnabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await sessionRules()).length, 0);
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} #watch`)).toBeEnabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  await setAutomatic(popup, false);
+  await setAutomatic(popup, true);
+  await expect(page.locator(`${root} iframe`)).toBeVisible();
+  await setAutomatic(popup, false);
+  await close(page);
+  await popup.close();
+  await expect.poll(async () => (await sessionRules()).length).toBe(0);
+});
+
+test("automatic playback leaves ambiguous, offline and failed lookups on Twitch", async () => {
+  const popup = await openPopup();
+  await setAutomatic(popup, true);
+  const second = "https://www.youtube.com/@second/streams";
+  await mockYouTube({ ...routes(), ...routes(SECOND_CHANNEL, SECOND_VIDEO, second) });
+  const page = await open("autouncertain");
+  await addLinks(page, [profileUrl, second]);
+  await expect(page.locator(`${root} #status`)).toContainText("Mehrere verlinkte");
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  await mockYouTube({ [profileUrl]: pageJson("ytInitialData", listing(CHANNEL, [])) });
+  await addLinks(page);
+  await expect(page.locator(`${root} #status`)).toContainText("kein öffentlicher");
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  await mockYouTube({});
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} #check`)).toBeEnabled();
+  await expect(page.locator(`${root} #watch`)).toBeDisabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await sessionRules()).length, 0);
+  await setAutomatic(popup, false);
+  await close(page);
+  await popup.close();
+});
+
+test("disabling automatic playback during initial lookup or revalidation never suspends Twitch", async () => {
+  const popup = await openPopup();
+  for (const phase of ["initial", "revalidation"]) {
+    await mockYouTube(routes());
+    await worker.evaluate((phase) => {
+      const fetchFixture = globalThis.fetch;
+      let calls = 0;
+      globalThis.fetch = async (...args) => {
+        calls += 1;
+        if (calls === (phase === "initial" ? 1 : 3)) {
+          await new Promise((resolve) => { globalThis.releaseAutoLookup = resolve; });
+        }
+        return fetchFixture(...args);
+      };
+    }, phase);
+    await setAutomatic(popup, true);
+    const page = await open(`autocancel${phase}`);
+    await addLinks(page);
+    await expect.poll(() => worker.evaluate(() => Boolean(globalThis.releaseAutoLookup))).toBe(true);
+    await setAutomatic(popup, false);
+    await worker.evaluate(() => { globalThis.releaseAutoLookup(); delete globalThis.releaseAutoLookup; });
+    await expect(page.locator(`${root} #watch`)).toBeEnabled();
+    await expect(page.locator(`${root} #status`)).toContainText("Live auf YouTube");
+    await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+    assert.equal((await sessionRules()).length, 0);
+    await close(page);
+  }
+  await popup.close();
+});
+
+test("disabling automatic playback while a suspension is in flight restores Twitch without opening YouTube", async () => {
+  await mockYouTube(routes());
+  const popup = await openPopup();
+  await setAutomatic(popup, true);
+  const page = await open("autocancelsuspension");
+  await worker.evaluate(() => {
+    const updateRules = chrome.declarativeNetRequest.updateSessionRules.bind(chrome.declarativeNetRequest);
+    globalThis.restoreAutoRules = () => { chrome.declarativeNetRequest.updateSessionRules = updateRules; };
+    chrome.declarativeNetRequest.updateSessionRules = async (updates) => {
+      if (updates.addRules?.length) await new Promise((resolve) => { globalThis.releaseAutoRules = resolve; });
+      return updateRules(updates);
+    };
+  });
+  await addLinks(page);
+  await expect.poll(() => worker.evaluate(() => Boolean(globalThis.releaseAutoRules))).toBe(true);
+  await setAutomatic(popup, false);
+  await worker.evaluate(() => { globalThis.releaseAutoRules(); delete globalThis.releaseAutoRules; });
+  await expect(page.locator(`${root} #watch`)).toBeEnabled();
+  await expect(page.locator(`${root} #status`)).toContainText("Live auf YouTube");
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await sessionRules()).length, 0);
+  await worker.evaluate(() => { globalThis.restoreAutoRules(); delete globalThis.restoreAutoRules; });
+  await close(page);
+  await popup.close();
+});
+
+test("automatic playback preserves the subscription guard and recovers once a nonsubscriber is confirmed", async () => {
+  await mockYouTube(routes());
+  const popup = await openPopup();
+  await setAutomatic(popup, true);
+  const page = await open("autosubscriber");
+  await page.evaluate(() => window.setSubscription("subscribed"));
+  await addLinks(page);
+  await expect(page.locator(`${root} #status`)).toContainText("Twitch läuft mit deinem Kanal-Abo weiter");
+  await expect(page.locator(`${root} #watch`)).toBeDisabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
+  await page.evaluate(() => window.setSubscription("unknown"));
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} #status`)).toContainText("Abo-Status konnte noch nicht bestätigt");
+  await expect(page.locator(`${root} #watch`)).toBeDisabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await sessionRules()).length, 0);
+  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
+  await page.evaluate(() => window.setSubscription("not-subscribed"));
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} iframe`)).toBeVisible();
+  await setAutomatic(popup, false);
+  await close(page);
+  await popup.close();
 });

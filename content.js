@@ -22,6 +22,8 @@
   let checkedLinks = "";
   let channel = null;
   let pageStyle = null;
+  let autoSwitch = false;
+  let settingsRevision = 0;
   let subscription = { state: "unknown" };
   let subscriptionPending = null;
   let subscriptionTimer = null;
@@ -124,7 +126,7 @@
     const previous = subscription.state;
     const result = await refreshSubscription();
     if (token !== generation) return;
-    if (result.state === "subscribed" && active && !switching) { void back(); return; }
+    if (result.state === "subscribed" && active && !switching) { void back(false); return; }
     if (result.state === "subscribed") stream = null;
     if (result.state === "not-subscribed" && previous !== result.state && !stream) void check(false);
     syncButtons();
@@ -199,6 +201,10 @@
     } else status(`Aktuell kein öffentlicher ${channel.displayName}-Livestream auf YouTube gefunden. Twitch läuft weiter.`);
   }
 
+  function maybeAutoSwitch() {
+    if (autoSwitch && stream && !stream.autoSwitchSuppressed && !checking) void watch(true);
+  }
+
   async function check(force = true) {
     if (checking || active || switching || !shadow) return;
     const token = generation;
@@ -228,12 +234,14 @@
       if (token === generation) {
         checking = false; syncButtons();
         if (checkedLinks !== JSON.stringify(youtubeLinks())) schedule();
+        else maybeAutoSwitch();
       }
     }
   }
 
-  async function watch() {
+  async function watch(automatic = false) {
     if (subscription.state !== "not-subscribed" || !stream || active || switching || !mount) return;
+    if (automatic && !autoSwitch) return;
     const token = generation;
     switching = true;
     syncButtons();
@@ -257,16 +265,29 @@
         status("Die YouTube-Profillinks haben sich geändert. Bitte erneut prüfen.");
         return;
       }
+      if (automatic && (!autoSwitch || selected.autoSwitchSuppressed)) {
+        showResult(selected);
+        return;
+      }
       if (selected.state !== "live") {
         showResult(selected);
         return;
       }
       stream = selected;
       shadow.getElementById("direct").href = `https://www.youtube.com/watch?v=${selected.videoId}`;
-      await send("SUSPEND");
+      const suspension = await send("SUSPEND", { automatic });
       if (token !== generation || !isChannel()) {
         // teardown already queues cleanup; a late extra RESUME could clear a
         // newer activation after navigation to another supported streamer.
+        return;
+      }
+      if (suspension.state !== "suspended") {
+        showResult(selected);
+        return;
+      }
+      if (automatic && !autoSwitch) {
+        await send("RESUME");
+        if (token === generation) showResult(selected);
         return;
       }
       // A periodic check can finish while the background guard is running.
@@ -315,14 +336,14 @@
     }
   }
 
-  async function back() {
+  async function back(keepTwitch = true) {
     if (!active || switching) return;
     const token = generation;
     switching = true;
     syncButtons();
     status("Stelle Twitch wieder her …");
     try {
-      await send("RESUME");
+      await send("RESUME", { keepTwitch });
       if (token !== generation || !isChannel()) return;
       // A blocked live player may retain an error. Reload gives Twitch a clean player.
       location.reload();
@@ -561,6 +582,25 @@
   window.addEventListener("popstate", routeChanged);
   window.addEventListener("pagehide", teardown);
   window.addEventListener("pageshow", schedule);
+  // Subscribe before reading so a popup change cannot be overwritten by an
+  // older initial read. Failure leaves the manual controls available.
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local" || !changes.autoSwitchToYouTube) return;
+      settingsRevision += 1;
+      autoSwitch = changes.autoSwitchToYouTube.newValue === true;
+      if (autoSwitch && stream) stream.autoSwitchSuppressed = false;
+      maybeAutoSwitch();
+    });
+    const revision = settingsRevision;
+    void chrome.storage.local.get({ autoSwitchToYouTube: false }).then((settings) => {
+      if (revision !== settingsRevision) return;
+      autoSwitch = settings.autoSwitchToYouTube === true;
+      maybeAutoSwitch();
+    }).catch(() => {});
+  } catch {
+    // Extension updates may invalidate storage alongside the runtime.
+  }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) void pollSubscription(); });
   routeChanged();
 })();

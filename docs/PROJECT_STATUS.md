@@ -6,10 +6,20 @@ Stand: 26. Oktober 2026. Version 0.3.0 baut auf dem unverändert übernommenen P
 
 - Weitere Twitch-Kanäle werden über direkte YouTube-Kanallinks im geladenen Profil und in den Infopanels zugeordnet. Unterstützt werden Handles, Kanal-IDs und ältere Kanal-URLs. Die beiden bisherigen festen Zuordnungen bleiben erhalten.
 - Die Erkennung berücksichtigt nachgeladene Links und verwirft alte Ergebnisse nach Kanal- oder Linkwechseln. Twitch-Kanalüberschrift und vorhandene Profilüberschrift müssen zum aktuellen Kanal passen. Chatlinks und Empfehlungen bleiben außen vor.
-- YouTube-Kanal-ID, Live-Status und Einbettbarkeit werden geprüft. Bis zu fünf unterschiedliche Kanal-URLs sind möglich. Bei mehreren live sendenden Kanälen oder einer fehlgeschlagenen Prüfung wird kein Player ausgewählt. Der Wechsel bleibt manuell.
+- YouTube-Kanal-ID, Live-Status und Einbettbarkeit werden geprüft. Bis zu fünf unterschiedliche Kanal-URLs sind möglich. Bei mehreren live sendenden Kanälen oder einer fehlgeschlagenen Prüfung wird kein Player ausgewählt. Der Wechsel ist standardmäßig manuell.
 - Das dunkle Panel ist kleiner und einklappbar. Der aktive Player behält die ganze Videofläche; das ⋯-Menü bleibt über dem Video. Das Popup erklärt die Erkennung und die YouTube-Anmeldung.
 
-### Aktuelle Prüfungen
+### Automatik und Erweiterungsicon
+
+Das externe Menü bietet jetzt den lokal gespeicherten Schalter **Automatisch zu YouTube**. Er ist standardmäßig aus und wirkt auf alle Twitch-Tabs. Die automatische Wiedergabe verwendet dieselbe erneute Live-Prüfung wie ein manueller Wechsel. Ausschalten während einer laufenden Prüfung oder Umschaltung verhindert die Aktivierung; bestehende YouTube-Player laufen weiter. Eine bewusste Rückkehr zu Twitch bleibt für diesen Kanal im selben Tab über Neuladungen erhalten, bis die Automatik erneut eingeschaltet oder der Tab geschlossen wird. Die Einstellung benötigt zusätzlich die Berechtigung `storage`.
+
+Das neue Brückenmotiv mit Play-Symbol ersetzt den bisherigen Platzhalter. SVG-Quelle und PNGs in 16, 32, 48 und 128 Pixeln liegen im Repository; `npm run icons` erzeugt die PNGs reproduzierbar mit Chromium.
+
+Die Automatik berücksichtigt den Abo-Schutz: Bei aktivem oder unklarem Kanal-Abo wird nicht gewechselt. Die Chromium-Tests prüfen beide Zustände und die anschließende Freigabe ohne Abo. Es werden keine zusätzlichen YouTube-Hintergrundabfragen eingeführt; die bestehende Abo-Prüfung bleibt erhalten.
+
+Aktuelle Prüfung nach Integration des Abo-Schutzes: `npm test` **62/62 bestanden**, `npm run check` bestanden und `npm run test:browser` mit allen vier MV3-/MAIN-World-Smoke-Prüfungen bestanden. Die geladene Erweiterung wurde zusätzlich auf gespeicherte Einstellung, Tastaturbedienung, mehrere Tabs, Rückkehr zu Twitch und Ausschalten während laufender Suche beziehungsweise Netzwerksperre geprüft. Popup und Icon wurden visuell geprüft. Die Browsernachweise verwenden kontrollierte Fixtures; eine neue Live-Prüfung von Twitch-/YouTube-Wiedergabe wurde für diese Änderung nicht durchgeführt.
+
+### Frühere Prüfungen der Kanalerkennung
 
 `npm test`: **26/26 bestanden**, davon 20 Logiktests und sechs Chromium-Integrationstests mit tatsächlich geladener Manifest-V3-Erweiterung. Die Integrationstests verwenden kontrollierte Twitch-/YouTube-Fixtures und echte Chromium-Session-Regeln. Abgedeckt sind nachgeladene Profillinks, mehrdeutige und beendete Streams, Änderungen während einer laufenden Suche, Kanalwechsel mit veraltetem Profil, zwei gleichzeitige Tabs, Playergröße, Einklappen, Tastaturbedienung, Menüs und Rückkehr zu Twitch.
 
