@@ -24,6 +24,9 @@
   let pageStyle = null;
   let autoSwitch = false;
   let settingsRevision = 0;
+  let subscription = { state: "unknown" };
+  let subscriptionPending = null;
+  let subscriptionTimer = null;
   const mutedVideos = new Map();
 
   function isChannel() {
@@ -78,12 +81,55 @@
   function syncButtons() {
     if (!shadow) return;
     shadow.getElementById("check").disabled = checking || switching || active;
-    shadow.getElementById("watch").disabled = !stream || checking || switching || active;
+    shadow.getElementById("watch").disabled = subscription.state !== "not-subscribed" || !stream || checking || switching || active;
     shadow.getElementById("back").hidden = !active;
     shadow.getElementById("watch").hidden = active;
     shadow.getElementById("check").hidden = active;
     shadow.getElementById("menu").hidden = !active;
     shadow.getElementById("close-menu").hidden = !active;
+  }
+
+  function subscriptionStatus() {
+    if (!shadow) return;
+    const messages = {
+      subscribed: "Aktives Kanal-Abo erkannt. Twitch bleibt aktiv; der Stream wird nicht ersetzt.",
+      "not-subscribed": "Kein aktives Kanal-Abo erkannt. Der Wechsel zu YouTube ist verfügbar.",
+      unknown: "Abo-Status noch unklar. Neue Wechsel bleiben bis zur Bestätigung gesperrt.",
+    };
+    const label = shadow.getElementById("subscription-status");
+    if (label.textContent !== messages[subscription.state]) label.textContent = messages[subscription.state];
+    syncButtons();
+  }
+
+  function refreshSubscription() {
+    if (subscriptionPending) return subscriptionPending;
+    const token = generation;
+    const request = (async () => {
+      let result;
+      try { result = await send("SUBSCRIPTION"); }
+      catch (error) { result = { state: "unknown", error: error.message }; }
+      if (token !== generation || !isChannel()) return { state: "unknown" };
+      subscription = result;
+      subscriptionStatus();
+      return result;
+    })();
+    subscriptionPending = request;
+    void request.finally(() => {
+      if (subscriptionPending === request) subscriptionPending = null;
+    });
+    return request;
+  }
+
+  async function pollSubscription() {
+    if (!root || document.hidden) return;
+    const token = generation;
+    const previous = subscription.state;
+    const result = await refreshSubscription();
+    if (token !== generation) return;
+    if (result.state === "subscribed" && active && !switching) { void back(false); return; }
+    if (result.state === "subscribed") stream = null;
+    if (result.state === "not-subscribed" && previous !== result.state && !stream) void check(false);
+    syncButtons();
   }
 
   function silence(video) {
@@ -122,6 +168,10 @@
     firstCheck = false;
     checkedLinks = "";
     stream = null;
+    subscription = { state: "unknown" };
+    subscriptionPending = null;
+    clearInterval(subscriptionTimer);
+    subscriptionTimer = null;
     root?.remove();
     root = null;
     shadow = null;
@@ -168,6 +218,12 @@
     status(`Suche den aktuellen ${channel.displayName}-Livestream …`);
     syncButtons();
     try {
+      const viewer = await refreshSubscription();
+      if (token !== generation || !isChannel()) return;
+      if (viewer.state !== "not-subscribed") {
+        status(viewer.error || (viewer.state === "subscribed" ? "Twitch läuft mit deinem Kanal-Abo weiter." : "Der Abo-Status konnte noch nicht bestätigt werden. Bitte erneut prüfen."));
+        return;
+      }
       const result = await send("LOOKUP", { force, youtubeLinks: links });
       if (token !== generation || !isChannel()) return;
       if (checkedLinks !== JSON.stringify(youtubeLinks())) return;
@@ -184,13 +240,20 @@
   }
 
   async function watch(automatic = false) {
-    if (!stream || active || switching || !mount) return;
+    if (subscription.state !== "not-subscribed" || !stream || active || switching || !mount) return;
     if (automatic && !autoSwitch) return;
     const token = generation;
     switching = true;
     syncButtons();
     status("Wechsle zu YouTube …");
     try {
+      const viewer = await refreshSubscription();
+      if (token !== generation || !isChannel()) return;
+      if (viewer.state !== "not-subscribed") {
+        stream = null;
+        status(viewer.error || "Twitch bleibt aktiv. Ein Wechsel ist nur ohne bestätigtes Kanal-Abo möglich.");
+        return;
+      }
       // The channel tab may have stayed open since a previous broadcast.
       // Recheck before suspending Twitch so an old result cannot open a VOD.
       const links = youtubeLinks();
@@ -225,6 +288,13 @@
       if (automatic && !autoSwitch) {
         await send("RESUME");
         if (token === generation) showResult(selected);
+        return;
+      }
+      // A periodic check can finish while the background guard is running.
+      if (subscription.state !== "not-subscribed") {
+        await send("RESUME");
+        if (token !== generation || !isChannel()) return;
+        location.reload();
         return;
       }
       active = true;
@@ -266,16 +336,19 @@
     }
   }
 
-  async function back() {
+  async function back(keepTwitch = true) {
     if (!active || switching) return;
+    const token = generation;
     switching = true;
     syncButtons();
     status("Stelle Twitch wieder her …");
     try {
-      await send("RESUME", { keepTwitch: true });
+      await send("RESUME", { keepTwitch });
+      if (token !== generation || !isChannel()) return;
       // A blocked live player may retain an error. Reload gives Twitch a clean player.
       location.reload();
     } catch (error) {
+      if (token !== generation) return;
       switching = false;
       status(`${error.message} Bitte Twitch neu laden oder die Erweiterung deaktivieren.`);
       syncButtons();
@@ -384,6 +457,7 @@
           </div>
           <div class="body" id="bridge-body">
             <p id="status">YouTube-Livestream prüfen …</p>
+            <p id="subscription-status" class="small" role="status" aria-live="polite"></p>
             <div class="actions">
               <button id="watch" type="button" disabled>YouTube ansehen</button>
               <button id="check" type="button">Erneut prüfen</button>
@@ -410,6 +484,8 @@
       collapse.setAttribute("aria-label", collapsed ? "Stream Bridge ausklappen" : "Stream Bridge einklappen");
       collapse.title = collapsed ? "Ausklappen" : "Einklappen";
     });
+    subscriptionStatus();
+    subscriptionTimer = setInterval(() => { void pollSubscription(); }, 5_000);
     shadow.getElementById("menu").addEventListener("click", () => {
       setMenuOpen(!root.hasAttribute("data-menu-open"));
     });
@@ -525,5 +601,6 @@
   } catch {
     // Extension updates may invalidate storage alongside the runtime.
   }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) void pollSubscription(); });
   routeChanged();
 })();

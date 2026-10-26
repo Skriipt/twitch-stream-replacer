@@ -9,6 +9,8 @@
 
 Über das Erweiterungsicon in der Browserleiste öffnest du das externe Menü. Dort lässt sich **Automatisch zu YouTube** ein- und ausschalten. Die Einstellung ist anfangs aus, wird lokal im Browserprofil gespeichert und gilt auch für bereits geöffnete Twitch-Tabs. Bei eingeschalteter Automatik öffnet das Add-on einen eindeutig erkannten, öffentlichen YouTube-Livestream selbstständig. Ausschalten beendet einen bereits geöffneten YouTube-Player nicht; weitere Wechsel erfolgen wieder manuell. Eine regelmäßige Hintergrundabfrage kommt dadurch nicht hinzu.
 
+Der Abo-Schutz gilt auch für die Automatik: Bei einem aktiven oder noch unklaren Kanal-Abo bleibt Twitch aktiv. Erst wenn Twitch bestätigt, dass kein Kanal-Abo besteht, ist ein Wechsel möglich.
+
 Während der YouTube-Wiedergabe ersetzt ein kleiner **⋯-Knopf oben rechts** den bisherigen Banner. Darüber sind **Zurück zu Twitch**, **Auf YouTube öffnen** und **YouTube-Konto & Premium** erreichbar. Das Menü liegt über dem Video und verkleinert es nicht. Mit **×**, **Escape** oder einem Klick in den Chat lässt es sich schließen.
 
 Twitchs kleine Vorschau über dem Chat, die bei Werbepausen erscheinen kann, wird im YouTube-Modus ausgeblendet und ihr Platz freigegeben. Beim Verlassen des YouTube-Modus gilt wieder Twitchs eigener Zustand.

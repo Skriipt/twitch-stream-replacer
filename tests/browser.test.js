@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
-import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl } from "./fixtures.js";
+import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl, subscriptionScript } from "./fixtures.js";
 
 const extensionPath = fileURLToPath(new URL("../", import.meta.url));
 let context;
@@ -21,7 +21,7 @@ function fixture(login) {
     <div class="picture-by-picture-player"><video></video>Ad preview fixture</div><p>Twitch chat fixture</p><textarea aria-label="Chat"></textarea>
     <a href="https://www.youtube.com/@chat_spam" data-a-target="social-media-link">Chat spam</a></aside></main>
     <header class="home-header-sticky"><a href="/${login}"><h1>${login}</h1></a><a data-a-target="channel-home-tab-About" href="/${login}/about">Info</a></header>
-    <section class="about-section"><div data-a-target="about-panel"><h3>Über ${login}</h3><div id="socials"></div></div></section></html>`;
+    <section class="about-section"><div data-a-target="about-panel"><h3>Über ${login}</h3><div id="socials"></div></div></section>${subscriptionScript(login)}</html>`;
 }
 async function mockYouTube(routes) {
   await worker.evaluate((routes) => {
@@ -141,7 +141,10 @@ test("profile ownership rejects stale SPA DOM; channel changes remove old player
   await expect(page.locator(`${root} #watch`)).toBeEnabled();
   await page.locator(`${root} #watch`).click();
   await expect(page.locator(`${root} iframe`)).toBeVisible();
-  await page.evaluate(() => history.pushState({}, "", "/nextcreator"));
+  await page.evaluate(() => {
+    history.pushState({}, "", "/nextcreator");
+    window.setSubscription("not-subscribed", "nextcreator");
+  });
   await expect(page.locator(`${root} #channel-name`)).toHaveText("nextcreator");
   await expect(page.locator(`${root} #status`)).toContainText("Kein YouTube-Kanallink");
   await expect(page.locator(`${root} iframe`)).toHaveCount(0);
@@ -391,6 +394,32 @@ test("disabling automatic playback while a suspension is in flight restores Twit
   await expect(page.locator(`${root} iframe`)).toHaveCount(0);
   assert.equal((await sessionRules()).length, 0);
   await worker.evaluate(() => { globalThis.restoreAutoRules(); delete globalThis.restoreAutoRules; });
+  await close(page);
+  await popup.close();
+});
+
+test("automatic playback preserves the subscription guard and recovers once a nonsubscriber is confirmed", async () => {
+  await mockYouTube(routes());
+  const popup = await openPopup();
+  await setAutomatic(popup, true);
+  const page = await open("autosubscriber");
+  await page.evaluate(() => window.setSubscription("subscribed"));
+  await addLinks(page);
+  await expect(page.locator(`${root} #status`)).toContainText("Twitch läuft mit deinem Kanal-Abo weiter");
+  await expect(page.locator(`${root} #watch`)).toBeDisabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
+  await page.evaluate(() => window.setSubscription("unknown"));
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} #status`)).toContainText("Abo-Status konnte noch nicht bestätigt");
+  await expect(page.locator(`${root} #watch`)).toBeDisabled();
+  await expect(page.locator(`${root} iframe`)).toHaveCount(0);
+  assert.equal((await sessionRules()).length, 0);
+  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
+  await page.evaluate(() => window.setSubscription("not-subscribed"));
+  await page.locator(`${root} #check`).click();
+  await expect(page.locator(`${root} iframe`)).toBeVisible();
+  await setAutomatic(popup, false);
   await close(page);
   await popup.close();
 });

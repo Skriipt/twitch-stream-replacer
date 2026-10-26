@@ -32,19 +32,22 @@ The intended feature set includes:
 ## How it works
 
 1. The extension identifies the Twitch channel being viewed.
-2. It reads YouTube channel links from the creator's loaded Twitch profile and info panels, then checks the linked channels for an active livestream. The two original configured channels remain available as fallbacks.
-3. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
-4. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
+2. It reads the current channel's subscription status from Twitch's loaded player data. An active subscription keeps Twitch playback; an unknown status temporarily prevents replacement.
+3. For viewers without a channel subscription, it reads YouTube channel links from the creator's loaded Twitch profile and info panels, then checks the linked channels for an active livestream. The two original configured channels remain available as fallbacks.
+4. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
+5. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
+
+The subscription check is repeated before switching and every five seconds while a supported channel tab is visible. If Twitch reports a new subscription during YouTube playback, the extension restores Twitch's network access and reloads the page. This guard applies to both manual and automatic switches. See [subscription detection](docs/SUBSCRIBER_DETECTION.md) for the state contract and validation limits.
 
 ### Automatic discovery in 0.3.0
 
 New creators no longer need a source-code mapping when their Twitch profile links to a YouTube channel. Handle (`/@name`), channel ID (`/channel/UC…`), and legacy `/c/`, `/user/` and bare custom-name links are supported. The extension verifies YouTube's channel ID and live player metadata before offering playback.
 
-Discovery uses the profile and panels currently loaded on the Twitch page. If no channel link is found, open the channel's **About / Info** section; links loaded later are checked automatically. Chat links and recommendations are excluded. Short video links, link aggregators and name-based search are outside this first version. There is no periodic background polling; use **Erneut prüfen** to check whether a broadcast has started since the last lookup.
+Discovery uses the profile and panels currently loaded on the Twitch page. If no channel link is found, open the channel's **About / Info** section; links loaded later are checked automatically. Chat links and recommendations are excluded. Short video links, link aggregators and name-based search are outside this first version. YouTube discovery has no periodic background polling; use **Erneut prüfen** to check whether a broadcast has started since the last lookup.
 
 Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly.
 
-Open the extension's toolbar popup and enable **Automatisch zu YouTube** to switch automatically when a single verified livestream is found. The setting is off by default, is saved locally in the browser profile, and applies to all Twitch tabs, including tabs already open. Turning it off leaves an existing YouTube player running and makes future switches manual. It does not add background polling. **Zurück zu Twitch** keeps that channel on Twitch in the current tab across reloads; switching the automatic setting off and on allows automatic playback there again.
+Open the extension's toolbar popup and enable **Automatisch zu YouTube** to switch automatically when a single verified livestream is found and Twitch confirms that you are not subscribed to the channel. The setting is off by default, is saved locally in the browser profile, and applies to all Twitch tabs, including tabs already open. Turning it off leaves an existing YouTube player running and makes future switches manual. It does not add background polling. **Zurück zu Twitch** keeps that channel on Twitch in the current tab across reloads; switching the automatic setting off and on allows automatic playback there again.
 
 ## Installation
 
@@ -78,6 +81,7 @@ The regular YouTube player uses the browser profile's YouTube session. The exten
 | `www.youtube.com` | Fetch channel and stream metadata. |
 | `*.ttvnw.net` and `declarativeNetRequestWithHostAccess` | Temporarily block Twitch video requests in the relevant tab. |
 | `storage` | Save the automatic playback preference locally and remember a tab's deliberate return to Twitch for the browser session. |
+| `scripting` | Read the subscription state in the Twitch page's JavaScript context, using the existing Twitch host permission. |
 
 The extension has no backend of its own and collects no telemetry. It does not have permission to read cookies. The browser may attach its existing YouTube session to requests; the embedded player connects directly to YouTube.
 
@@ -95,6 +99,7 @@ The project consists of JavaScript and HTML with no external runtime dependencie
 | `content.js` | Player replacement, menu, media controls, and channel navigation. |
 | `popup.html`, `popup.js` | Toolbar popup with instructions and the saved automatic playback switch. |
 | `assets/icon.svg` | Editable Stream Bridge mark; `npm run icons` regenerates the packaged PNG sizes. |
+| `subscriber.js` | Read the current channel's subscription state from Twitch's committed player data. |
 
 After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), currently in German.
 
@@ -108,6 +113,8 @@ npx playwright install chromium
 npm test
 ```
 
-`npm run test:unit` runs the URL, resolver and service-worker tests. The full suite additionally loads the actual unpacked extension in headless Chromium against controlled Twitch and YouTube fixtures. It exercises discovery, player controls, channel navigation and real Chromium session rules. These tests do not establish live YouTube playback, sign-in or Premium behaviour.
+`npm run test:unit` runs the URL, resolver, service-worker and subscription regression tests. `npm run check` checks the extension JavaScript syntax. The full suite additionally loads the actual unpacked extension in headless Chromium against controlled Twitch and YouTube fixtures. It exercises discovery, player controls, channel navigation and real Chromium session rules. These tests do not establish live YouTube playback, sign-in or Premium behaviour.
+
+For the real Manifest V3 smoke test against synthetic Twitch/YouTube responses, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. An existing Chromium executable can be selected with `CHROMIUM_EXECUTABLE`.
 
 An independent project with no affiliation with Twitch, YouTube, or the respective streamers.
