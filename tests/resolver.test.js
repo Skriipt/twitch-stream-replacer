@@ -62,6 +62,26 @@ test("two linked channels with active streams stay ambiguous", async () => {
   serve({ ...liveRoutes(), ...liveRoutes(secondUrl, SECOND_CHANNEL, SECOND_VIDEO) });
   assert.deepEqual(await discoverLiveStream(creator, [profileUrl, secondUrl]), { state: "ambiguous" });
 });
+
+test("checks linked channels concurrently without offering a stream before every channel is verified", async () => {
+  const secondUrl = "https://www.youtube.com/@second/streams";
+  const calls = serve({ ...liveRoutes(), [secondUrl]: pageJson("ytInitialData", listing(SECOND_CHANNEL, [])) });
+  const fetchFixture = globalThis.fetch;
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  globalThis.fetch = async (...args) => {
+    if (args[0] === profileUrl) await gate;
+    return fetchFixture(...args);
+  };
+  let settled = false;
+  const lookup = discoverLiveStream(creator, [profileUrl, secondUrl]).finally(() => { settled = true; });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(calls.some(({ url }) => url === secondUrl), "second channel must start while the first is still loading");
+    assert.equal(settled, false, "must wait for the pending channel before selecting a stream");
+  } finally { release(); await lookup; }
+  assert.equal((await lookup).videoId, VIDEO);
+});
 test("one live among multiple checked channels is found; aliases are deduplicated by channel ID", async () => {
   const secondUrl = "https://www.youtube.com/@second/streams";
   serve({ ...liveRoutes(), [secondUrl]: pageJson("ytInitialData", listing(SECOND_CHANNEL, [])) });

@@ -4,6 +4,7 @@
   const ROOT_ID = "stylerz-bridge-prototype";
   const ACTIVE_ATTRIBUTE = "data-stream-bridge-active";
   const PREVIEW_SELECTOR = ".picture-by-picture-player";
+  const RELOAD_MESSAGE = "Erweiterung bitte neu laden und Twitch aktualisieren.";
   if (window.top !== window || document.getElementById(ROOT_ID)) return;
 
   let root = null;
@@ -27,9 +28,25 @@
     return Boolean(CONFIG.channelForUrl(location.href));
   }
 
+  function extensionRuntime() {
+    const runtime = globalThis.chrome?.runtime;
+    if (!runtime?.id || typeof runtime.sendMessage !== "function") throw new Error(RELOAD_MESSAGE);
+    return runtime;
+  }
+
   async function send(type, fields = {}) {
-    const reply = await chrome.runtime.sendMessage({ type, twitchLogin: channel?.twitchLogin, ...fields });
-    if (!reply?.ok) throw new Error(reply?.error || "Erweiterung bitte neu laden und Twitch aktualisieren.");
+    let reply;
+    try {
+      reply = await extensionRuntime().sendMessage({ type, twitchLogin: channel?.twitchLogin, ...fields });
+    } catch (error) {
+      // Reloading/updating the extension invalidates scripts in already-open
+      // tabs. They cannot reconnect themselves; the Twitch page must reload.
+      if (!globalThis.chrome?.runtime?.id || /Extension context invalidated|Receiving end does not exist|Could not establish connection/i.test(error.message)) {
+        throw new Error(RELOAD_MESSAGE);
+      }
+      throw error;
+    }
+    if (!reply?.ok) throw new Error(reply?.error || RELOAD_MESSAGE);
     return reply.result;
   }
 
@@ -457,9 +474,14 @@
     if (active && root?.hasAttribute("data-menu-open") && !event.composedPath().includes(root)) setMenuOpen(false);
   });
   window.navigation?.addEventListener("navigatesuccess", routeChanged);
-  chrome.runtime.onMessage.addListener((message, sender) => {
-    if (sender.id === chrome.runtime.id && message?.type === "ROUTE_CHANGED") routeChanged();
-  });
+  try {
+    const runtime = extensionRuntime();
+    runtime.onMessage.addListener((message, sender) => {
+      if (sender.id === runtime.id && message?.type === "ROUTE_CHANGED") routeChanged();
+    });
+  } catch {
+    // Continue mounting the UI so the initial check can show reload guidance.
+  }
   window.addEventListener("popstate", routeChanged);
   window.addEventListener("pagehide", teardown);
   window.addEventListener("pageshow", schedule);
