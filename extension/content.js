@@ -303,6 +303,7 @@
       stopNativeVideos();
       const frame = document.createElement("iframe");
       frame.id = "youtube";
+      frame.name = "stream-bridge-youtube";
       frame.title = `${channel.displayName} – YouTube-Livestream`;
       // youtube.com intentionally shares the browser's regular YouTube session.
       // Do not use youtube-nocookie.com or a credentialless/sandboxed iframe.
@@ -425,18 +426,18 @@
         details p { margin:6px 0 0; } .small { font-size:12px; }
         #screen { position:absolute; inset:0; pointer-events:auto; background:#000; }
         iframe { display:block; border:0; width:100%; height:100%; }
-        #menu { position:absolute; top:10px; right:10px; z-index:2; pointer-events:auto;
+        #menu { position:absolute; top:50%; right:10px; transform:translateY(-50%); z-index:2; pointer-events:auto;
           width:36px; height:30px; min-height:0; padding:0; font-size:22px; line-height:1; border-radius:4px;
           background:#18181bcc; opacity:.45; transition:opacity .15s ease; }
         #menu:hover, #menu:focus-visible, :host([data-menu-open]) #menu { opacity:1; }
+        #menu:active { transform:translateY(-50%); }
         .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
         :host([data-active]) .bridge { background:#0e0e10; pointer-events:auto; }
-        :host([data-active]) .panel { display:none; left:auto; right:10px; top:48px; z-index:3;
-          max-height:calc(100% - 60px); background:#18181bfa; }
+        :host([data-active]) .panel { display:none; left:auto; right:54px; top:50%; transform:translateY(-50%); z-index:3;
+          width:min(360px,calc(100% - 64px)); max-height:calc(100% - 20px); background:#18181bfa; }
         :host([data-active][data-menu-open]) .panel { display:block; }
         @container (max-width:480px) {
           .panel { top:6px; left:6px; width:calc(100% - 12px); }
-          :host([data-active]) .panel { right:6px; width:calc(100% - 12px); }
           #direct { margin-left:0; }
         }
         @container (max-height:260px) { :host(:not([data-active])) details { display:none; } }

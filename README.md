@@ -37,6 +37,8 @@ The intended feature set includes:
 4. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
 5. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
 
+During YouTube playback, the menu sits halfway down the right edge, clear of the player's corner controls. Hover over the stream and use the mouse wheel to adjust volume in 1-percentage-point steps, down to mute at 0% and up to 100%.
+
 The subscription check is repeated before switching and every five seconds while a supported channel tab is visible. If Twitch reports a new subscription during YouTube playback, the extension restores Twitch's network access and reloads the page. This guard applies to both manual and automatic switches. See [subscription detection](docs/SUBSCRIBER_DETECTION.md) for the state contract and validation limits.
 
 ### Automatic discovery in 0.3.0
@@ -106,6 +108,7 @@ scripts/         Development tools for regenerating extension assets
 | `extension/resolver.js` | Read YouTube metadata and validate livestreams. |
 | `extension/background.js` | Service worker, lookup cache, and per-tab network rules. |
 | `extension/content.js` | Player replacement, menu, media controls, and channel navigation. |
+| `extension/youtube-volume.js` | Mouse-wheel volume control inside the Stream Bridge YouTube embed. |
 | `extension/subscriber.js` | Read the current channel's subscription state from Twitch's committed player data. |
 | `extension/popup.html`, `extension/popup.js` | Toolbar popup with instructions and the saved automatic playback switch. |
 | `extension/assets/icon.svg` | Editable Stream Bridge mark; `npm run icons` regenerates the packaged PNG sizes. |

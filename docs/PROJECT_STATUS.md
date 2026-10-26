@@ -8,6 +8,7 @@ Updated: October 26, 2026. Version 0.3.0 adds profile-based channel discovery an
 - Discovery handles links loaded after navigation and discards stale results after channel or link changes. Twitch channel and profile headings must match the current channel. Chat links and recommendations are excluded.
 - The resolver verifies channel identity, live status, and embedding support for up to five distinct channel URLs. Multiple live channels or a failed check leave Twitch playing.
 - A compact, collapsible panel and an overlay menu preserve the full player area. The toolbar popup explains discovery and YouTube sign-in.
+- The active menu button sits halfway down the right edge to avoid YouTube's corner controls. Mouse-wheel input over the Stream Bridge embed changes volume by one percentage point per event, clamps to 0–100%, mutes at zero, and unmutes when raised. A narrowly scoped content script handles wheel events inside the cross-origin embed using the existing YouTube permission.
 - The subscription guard keeps Twitch playback for active channel subscribers. Missing or uncertain player data blocks replacement; see [subscription detection](SUBSCRIBER_DETECTION.md) for the state contract and evidence.
 
 Discovery only reads direct channel URLs in the currently loaded profile. Open **About / Info** when links are missing. Name-based search, link aggregators, individual video links, and periodic YouTube discovery polling are not implemented. **Erneut prüfen** (Check again) starts a new lookup after a previous one finishes.
@@ -36,6 +37,8 @@ npm test
 `npm run test:browser` covers runtime failure handling and the actual unpacked Manifest V3 extension in Chromium against controlled Twitch/YouTube responses. It exercises delayed profile links, ambiguous and ended streams, pending lookup changes, stale profiles during navigation, multiple tabs, player sizing, keyboard and menu controls, subscription checks in the page's `MAIN` world, restoration of Twitch playback and network access, saved automatic switching preferences, keyboard operation, deliberate returns to Twitch, and cancellation during pending lookups or network suspension. `npm test` runs both groups. GitHub Actions runs the same checks on pull requests and pushes to `main`.
 
 These checks establish fixture behavior and real Chromium extension integration. They do not establish authenticated Twitch behavior, real subscription purchases/expirations, YouTube playback, Premium benefits, or behavior during actual Twitch ad breaks.
+
+Player-control regressions additionally exercise clickable native corner controls at 960×540, 400×225, and 320×180; real mouse-wheel input inside a cross-origin embed; exact 1% steps, mute/unmute and volume limits; and isolation from unrelated YouTube embeds and standalone players. These use synthetic player controls and an HTML video element, rather than live YouTube playback.
 
 ## Previous live observations
 

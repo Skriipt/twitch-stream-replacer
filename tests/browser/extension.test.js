@@ -11,6 +11,14 @@ let worker;
 const root = "#stylerz-bridge-prototype";
 const pages = new Set();
 const errors = [];
+const embedFixture = `<!doctype html><html><head><style>
+  body{margin:0;background:black;color:white}video{display:block;width:100vw;height:100vh}
+  button{position:absolute;right:10px;width:36px;height:30px}#settings{top:10px}#fullscreen{bottom:10px}
+</style></head><body><video></video><button id="settings" aria-label="Settings">⚙</button>
+<button id="fullscreen" aria-label="Fullscreen">⛶</button><script>
+  document.querySelector('video').volume = 0.5;
+  document.querySelector('#settings').onclick = () => { document.body.dataset.settingsClicked = 'true'; };
+</script></body></html>`;
 function fixture(login) {
   return `<!doctype html><html lang="de"><meta charset="utf-8"><style>
     body{margin:0;background:#0e0e10;color:#efeff1;font:14px system-ui}main{display:flex;gap:12px}
@@ -82,7 +90,7 @@ before(async () => {
   });
   worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
   await context.route("https://www.twitch.tv/**", (route) => route.fulfill({ contentType: "text/html", body: fixture(new URL(route.request().url()).pathname.split("/")[1]) }));
-  await context.route("https://www.youtube.com/embed/**", (route) => route.fulfill({ contentType: "text/html", body: "<html><body style='margin:0;background:black;color:white'>YouTube embed fixture</body></html>" }));
+  await context.route("https://www.youtube.com/embed/**", (route) => route.fulfill({ contentType: "text/html", body: embedFixture }));
 });
 after(async () => { await context?.close(); assert.deepEqual(errors, []); });
 
@@ -132,6 +140,111 @@ test("loaded extension discovers late profile links, switches video and preserve
   assert.equal((await sessionRules()).length, 0);
   await expect(page.locator(".picture-by-picture-player")).toBeVisible();
   await close(page);
+});
+
+test("bridge menu leaves native YouTube corner controls clickable at normal and small sizes", async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    const frame = page.frameLocator(`${root} iframe`);
+    for (const [width, height] of [[960, 540], [400, 225], [320, 180]]) {
+      await page.locator(".channel-root__player").evaluate((element, [width, height]) => {
+        element.style.width = `${width}px`; element.style.height = `${height}px`;
+      }, [width, height]);
+      const menu = await page.locator(`${root} #menu`).boundingBox();
+      const screen = await page.locator(`${root} iframe`).boundingBox();
+      for (const control of ["settings", "fullscreen"]) {
+        const box = await frame.locator(`#${control}`).boundingBox();
+        const overlaps = menu.x < box.x + box.width && menu.x + menu.width > box.x &&
+          menu.y < box.y + box.height && menu.y + menu.height > box.y;
+        assert.equal(overlaps, false, `${width}×${height}: bridge menu overlaps ${control}`);
+      }
+      assert.ok(menu.y >= screen.y && menu.y + menu.height <= screen.y + screen.height);
+      await frame.getByRole("button", { name: "Settings", exact: true }).click();
+      await expect(frame.locator("body")).toHaveAttribute("data-settings-clicked", "true");
+      await page.locator(`${root} #menu`).click();
+      const panel = await page.locator(`${root} .panel`).boundingBox();
+      assert.ok(panel.x >= screen.x && panel.x + panel.width <= screen.x + screen.width);
+      assert.ok(panel.y >= screen.y && panel.y + panel.height <= screen.y + screen.height);
+      await page.locator(`${root} #close-menu`).press("Escape");
+    }
+  } finally { await close(page); }
+});
+
+test("wheel over the cross-origin YouTube player changes volume by 1%, clamps and mutes", async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    const video = page.frameLocator(`${root} iframe`).locator("video");
+    await expect(video).toHaveJSProperty("volume", 0.5);
+    await video.hover();
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 0.51);
+    await page.mouse.wheel(0, 120);
+    await expect(video).toHaveJSProperty("volume", 0.5);
+    await video.evaluate((element) => { element.volume = 0.01; });
+    await page.mouse.wheel(0, 120);
+    await expect(video).toHaveJSProperty("volume", 0);
+    await expect(video).toHaveJSProperty("muted", true);
+    await page.mouse.wheel(0, 120);
+    await expect(video).toHaveJSProperty("volume", 0);
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 0.01);
+    await expect(video).toHaveJSProperty("muted", false);
+    await video.evaluate((element) => { element.volume = 0.99; });
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 1);
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 1);
+    // Native mute and volume changes must be the starting point for the next step.
+    await video.evaluate((element) => { element.volume = 0.7; element.muted = true; });
+    await page.mouse.wheel(0, -1);
+    await expect(video).toHaveJSProperty("volume", 0.01);
+    await expect(video).toHaveJSProperty("muted", false);
+    const ignored = await video.evaluate((element) => {
+      return [{ deltaX: 120 }, { deltaY: -120, ctrlKey: true }, { deltaY: -120, metaKey: true }].map((options) => {
+        const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, ...options });
+        element.dispatchEvent(event);
+        return { volume: element.volume, prevented: event.defaultPrevented };
+      });
+    });
+    assert.deepEqual(ignored, Array(3).fill({ volume: 0.01, prevented: false }));
+    // Wheel events inside a cross-origin frame do not bubble to the parent.
+    const captured = await video.evaluate((element) => {
+      const event = new WheelEvent("wheel", { deltaY: 1, bubbles: true, cancelable: true });
+      element.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    assert.equal(captured, true);
+    await expect(video).toHaveJSProperty("volume", 0);
+    await page.getByRole("textbox", { name: "Chat" }).hover();
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 0);
+  } finally { await close(page); }
+});
+
+test("wheel support leaves unrelated YouTube embeds and standalone players unchanged", async () => {
+  const page = await open();
+  try {
+    await page.evaluate((videoId) => {
+      const frame = document.createElement("iframe");
+      frame.id = "unrelated-youtube";
+      frame.src = `https://www.youtube.com/embed/${videoId}`;
+      document.body.prepend(frame);
+    }, VIDEO);
+    const video = page.frameLocator("#unrelated-youtube").locator("video");
+    await video.hover();
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 0.5);
+    await page.goto(`https://www.youtube.com/embed/${VIDEO}`);
+    await page.locator("video").hover();
+    await page.mouse.wheel(0, -120);
+    await expect(page.locator("video")).toHaveJSProperty("volume", 0.5);
+  } finally { await close(page); }
 });
 
 test("profile ownership rejects stale SPA DOM; channel changes remove old player and network rules", async () => {
