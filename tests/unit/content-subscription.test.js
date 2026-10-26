@@ -37,6 +37,7 @@ async function page(t, initial = "not-subscribed") {
         if (overridden !== undefined) return overridden;
         if (message.type === "SUBSCRIPTION") return { ok: true, result: { state, twitchLogin: message.twitchLogin } };
         if (message.type === "LOOKUP") return { ok: true, result: { state: "live", videoId: "abcdefghijk", title: "Live" } };
+        if (message.type === "SUSPEND") return { ok: true, result: { state: "suspended" } };
         return { ok: true, result: {} };
       },
     },

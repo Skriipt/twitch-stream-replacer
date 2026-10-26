@@ -37,7 +37,7 @@ The intended feature set includes:
 4. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
 5. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
 
-The subscription check is repeated before switching and every five seconds while a supported channel tab is visible. If Twitch reports a new subscription during YouTube playback, the extension restores Twitch's network access and reloads the page. This is the basis for a future automatic switcher; switching to YouTube remains manual. See [subscription detection](docs/SUBSCRIBER_DETECTION.md) for the state contract and validation limits.
+The subscription check is repeated before switching and every five seconds while a supported channel tab is visible. If Twitch reports a new subscription during YouTube playback, the extension restores Twitch's network access and reloads the page. This guard applies to both manual and automatic switches. See [subscription detection](docs/SUBSCRIBER_DETECTION.md) for the state contract and validation limits.
 
 ### Automatic discovery in 0.3.0
 
@@ -45,7 +45,9 @@ New creators no longer need a source-code mapping when their Twitch profile link
 
 Discovery uses the profile and panels currently loaded on the Twitch page. If no channel link is found, open the channel's **About / Info** section; links loaded later are checked automatically. Chat links and recommendations are excluded. Short video links, link aggregators and name-based search are outside this first version. YouTube discovery has no periodic background polling; use **Erneut prüfen** to check whether a broadcast has started since the last lookup.
 
-Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly. Finding a stream never switches playback automatically.
+Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly.
+
+Open the extension's toolbar popup and enable **Automatisch zu YouTube** to switch automatically when a single verified livestream is found and Twitch confirms that you are not subscribed to the channel. The setting is off by default, is saved locally in the browser profile, and applies to all Twitch tabs, including tabs already open. Turning it off leaves an existing YouTube player running and makes future switches manual. It does not add background polling. **Zurück zu Twitch** keeps that channel on Twitch in the current tab across reloads; switching the automatic setting off and on allows automatic playback there again.
 
 ## Installation
 
@@ -78,6 +80,7 @@ The regular YouTube player uses the browser profile's YouTube session. The exten
 | `www.twitch.tv` | Identify the channel and insert the controls and player. |
 | `www.youtube.com` | Fetch channel and stream metadata. |
 | `*.ttvnw.net` and `declarativeNetRequestWithHostAccess` | Temporarily block Twitch video requests in the relevant tab. |
+| `storage` | Save the automatic playback preference locally and remember a tab's deliberate return to Twitch for the browser session. |
 | `scripting` | Read the subscription state in the Twitch page's JavaScript context, using the existing Twitch host permission. |
 
 The extension has no backend of its own and collects no telemetry. It does not have permission to read cookies. The browser may attach its existing YouTube session to requests; the embedded player connects directly to YouTube.
@@ -92,6 +95,7 @@ tests/unit/      Logic and subscription lifecycle tests with mocked APIs/JSDOM
 tests/browser/   Chromium integration and runtime regression tests
 tests/fixtures.js Shared synthetic Twitch/YouTube data
 docs/            Installation, project status, and subscription design notes
+scripts/         Development tools for regenerating extension assets
 ```
 
 | File | Purpose |
@@ -103,7 +107,8 @@ docs/            Installation, project status, and subscription design notes
 | `extension/background.js` | Service worker, lookup cache, and per-tab network rules. |
 | `extension/content.js` | Player replacement, menu, media controls, and channel navigation. |
 | `extension/subscriber.js` | Read the current channel's subscription state from Twitch's committed player data. |
-| `extension/popup.html` | Entry point through the extension's toolbar icon. |
+| `extension/popup.html`, `extension/popup.js` | Toolbar popup with instructions and the saved automatic playback switch. |
+| `extension/assets/icon.svg` | Editable Stream Bridge mark; `npm run icons` regenerates the packaged PNG sizes. |
 
 After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 

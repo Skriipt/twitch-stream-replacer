@@ -7,6 +7,17 @@ const cached = new Map();
 const pending = new Map();
 let ruleQueue = Promise.resolve();
 
+const overrideKey = (tabId) => `twitchOverride:${tabId}`;
+async function autoSwitchSettings(tabId, login) {
+  const [settings, overrides] = await Promise.all([
+    chrome.storage.local.get({ autoSwitchToYouTube: false, autoSwitchRevision: "" }),
+    chrome.storage.session.get(overrideKey(tabId)),
+  ]);
+  const override = overrides[overrideKey(tabId)];
+  const suppressed = override?.login === login && override.revision === settings.autoSwitchRevision;
+  return { enabled: settings.autoSwitchToYouTube === true, suppressed };
+}
+
 function isChannel(url) {
   return Boolean(CONFIG.channelForUrl(url));
 }
@@ -54,8 +65,12 @@ async function lookup(channel, force = false, links = []) {
 
 // All tabs share the rule ID space. Serialize updates globally so simultaneous
 // activation in two streamer tabs cannot overwrite the other's video rule.
-function setSuspended(tabId, suspended, expectedLogin) {
+function setSuspended(tabId, suspended, expectedLogin, automatic = false) {
   const operation = ruleQueue.catch(() => {}).then(async () => {
+    if (suspended && automatic) {
+      const settings = await autoSwitchSettings(tabId, expectedLogin);
+      if (!settings.enabled || settings.suppressed) return false;
+    }
     const rules = await chrome.declarativeNetRequest.getSessionRules();
     const owned = rules.filter((rule) => rule.condition.tabIds?.includes(tabId));
     if (!suspended && owned.length === 0) return;
@@ -82,6 +97,7 @@ function setSuspended(tabId, suspended, expectedLogin) {
       });
     }
     await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds, addRules });
+    return true;
   });
   ruleQueue = operation.catch(() => {});
   return operation;
@@ -97,14 +113,25 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const tab = await chrome.tabs.get(sender.tab.id);
       const channel = CONFIG.channelForUrl(tab.url);
       if (!channel || channel.twitchLogin !== message.twitchLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
-      return lookup(channel, message.force === true, message.youtubeLinks);
+      const [result, settings] = await Promise.all([
+        lookup(channel, message.force === true, message.youtubeLinks),
+        autoSwitchSettings(sender.tab.id, channel.twitchLogin),
+      ]);
+      return { ...result, autoSwitchSuppressed: settings.suppressed };
     }
     if (message?.type === "SUBSCRIPTION") return subscription(sender.tab.id, message.twitchLogin);
     if (message?.type === "SUSPEND") {
-      await setSuspended(sender.tab.id, true, message.twitchLogin);
-      return { state: "suspended" };
+      const suspended = await setSuspended(sender.tab.id, true, message.twitchLogin, message.automatic === true);
+      return { state: suspended ? "suspended" : "cancelled" };
     }
     if (message?.type === "RESUME") {
+      if (message.keepTwitch === true) {
+        const tab = await chrome.tabs.get(sender.tab.id);
+        const channel = CONFIG.channelForUrl(tab.url);
+        if (!channel || channel.twitchLogin !== message.twitchLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
+        const settings = await chrome.storage.local.get({ autoSwitchRevision: "" });
+        await chrome.storage.session.set({ [overrideKey(sender.tab.id)]: { login: channel.twitchLogin, revision: settings.autoSwitchRevision } });
+      }
       await setSuspended(sender.tab.id, false);
       return { state: "resumed" };
     }
@@ -123,4 +150,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
     void setSuspended(tabId, false).catch(() => {});
   }
 });
-chrome.tabs.onRemoved.addListener((tabId) => { void setSuspended(tabId, false).catch(() => {}); });
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void setSuspended(tabId, false).catch(() => {});
+  void chrome.storage.session.remove(overrideKey(tabId)).catch(() => {});
+});

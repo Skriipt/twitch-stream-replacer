@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "icons": "node scripts/generate-icons.mjs",
     "test": "node --test tests/unit/*.test.js tests/browser/*.test.js",
     "test:unit": "node --test tests/unit/*.test.js",
     "test:browser": "node --test tests/browser/*.test.js",
-    "check": "node --check extension/background.js && node --check extension/content.js && node --check extension/subscriber.js && node --check extension/resolver.js && node --check extension/config.js && node --check extension/discovery.js"
+    "check": "node --check extension/background.js && node --check extension/content.js && node --check extension/subscriber.js && node --check extension/resolver.js && node --check extension/config.js && node --check extension/discovery.js && node --check extension/popup.js && node --check scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

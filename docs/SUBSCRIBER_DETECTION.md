@@ -1,6 +1,6 @@
 # Channel subscription detection
 
-Stream Bridge keeps Twitch playback when the viewer has an active subscription to the supported channel currently open. A missing subscription permits the existing manual YouTube switch. There is no automatic switch to YouTube in this change.
+Stream Bridge keeps Twitch playback when the viewer has an active subscription to the supported channel currently open. A confirmed missing subscription permits the manual YouTube switch and the optional automatic switch configured in the toolbar popup.
 
 ## State contract
 
@@ -9,7 +9,7 @@ The service worker handles `SUBSCRIPTION` messages from the extension's top-leve
 | State | Evidence | Replacement policy |
 | --- | --- | --- |
 | `subscribed` | Matching channel, identified viewer, and a nonempty `self.subscriptionBenefit.id`. | Keep Twitch; skip the YouTube lookup. |
-| `not-subscribed` | Matching channel with an explicit null benefit for the identified viewer, or loaded signed-out `currentUser: null` data without a benefit. | Allow the existing manual switch after checking for a live YouTube stream. |
+| `not-subscribed` | Matching channel with an explicit null benefit for the identified viewer, or loaded signed-out `currentUser: null` data without a benefit. | Allow manual or opted-in automatic switching after checking for a live YouTube stream. |
 | `unknown` | Missing/loading/error data, conflicting viewer or benefit states, unavailable React internals, navigation, or failed script execution. | Block new replacement attempts and retry the subscription check. |
 
 Prime, gifted, paid, and nonrenewing subscriptions use the same active benefit. Prime eligibility, Turbo, follower/moderator flags, another viewer's chat badges, and subscribe-button text do not establish a channel subscription. An active benefit continues to count until Twitch removes it; disabling renewal alone does not mean it has expired.
