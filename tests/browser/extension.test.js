@@ -14,9 +14,32 @@ const errors = [];
 const embedFixture = `<!doctype html><html><head><style>
   body{margin:0;background:black;color:white}video{display:block;width:100vw;height:100vh}
   button{position:absolute;right:10px;width:36px;height:30px}#settings{top:10px}#fullscreen{bottom:10px}
-</style></head><body><video></video><button id="settings" aria-label="Settings">⚙</button>
-<button id="fullscreen" aria-label="Fullscreen">⛶</button><script>
-  document.querySelector('video').volume = 0.5;
+</style></head><body><div id="movie_player"><video></video><button id="settings" aria-label="Settings">⚙</button>
+<button id="fullscreen" aria-label="Fullscreen">⛶</button>
+<button id="mute" aria-label="Mute" aria-pressed="false" style="left:10px;right:auto;bottom:10px">Mute</button>
+<input id="volume" aria-label="Volume" type="range" min="0" max="100" value="50" style="position:absolute;left:60px;bottom:10px">
+</div><script>
+  // Model YouTube's player state separately from the underlying media element.
+  // Reconciliation must not undo changes made through the player controls.
+  const player = document.querySelector('#movie_player');
+  let volume = 50;
+  let muted = false;
+  window.reconcilePlayerState = () => {
+    const video = player.querySelector('video');
+    video.volume = volume / 100;
+    video.muted = muted;
+    document.querySelector('#volume').value = volume;
+    document.querySelector('#mute').setAttribute('aria-pressed', String(muted));
+  };
+  player.getVolume = () => volume;
+  player.isMuted = () => muted;
+  player.setVolume = (next) => { volume = next; window.reconcilePlayerState(); };
+  player.mute = () => { muted = true; window.reconcilePlayerState(); };
+  // Observed in the live embed: unMute raises low volumes to at least 5%.
+  player.unMute = () => { muted = false; volume = Math.max(5, volume); window.reconcilePlayerState(); };
+  document.querySelector('#mute').onclick = () => { muted ? player.unMute() : player.mute(); };
+  document.querySelector('#volume').oninput = (event) => { player.setVolume(Number(event.target.value)); player.unMute(); };
+  window.reconcilePlayerState();
   document.querySelector('#settings').onclick = () => { document.body.dataset.settingsClicked = 'true'; };
 </script></body></html>`;
 function fixture(login) {
@@ -186,7 +209,7 @@ test("wheel over the cross-origin YouTube player changes volume by 1%, clamps an
     await expect(video).toHaveJSProperty("volume", 0.51);
     await page.mouse.wheel(0, 120);
     await expect(video).toHaveJSProperty("volume", 0.5);
-    await video.evaluate((element) => { element.volume = 0.01; });
+    await video.evaluate(() => { document.getElementById("movie_player").setVolume(1); });
     await page.mouse.wheel(0, 120);
     await expect(video).toHaveJSProperty("volume", 0);
     await expect(video).toHaveJSProperty("muted", true);
@@ -195,13 +218,17 @@ test("wheel over the cross-origin YouTube player changes volume by 1%, clamps an
     await page.mouse.wheel(0, -120);
     await expect(video).toHaveJSProperty("volume", 0.01);
     await expect(video).toHaveJSProperty("muted", false);
-    await video.evaluate((element) => { element.volume = 0.99; });
+    await video.evaluate(() => { document.getElementById("movie_player").setVolume(99); });
     await page.mouse.wheel(0, -120);
     await expect(video).toHaveJSProperty("volume", 1);
     await page.mouse.wheel(0, -120);
     await expect(video).toHaveJSProperty("volume", 1);
     // Native mute and volume changes must be the starting point for the next step.
-    await video.evaluate((element) => { element.volume = 0.7; element.muted = true; });
+    await video.evaluate(() => {
+      const player = document.getElementById("movie_player");
+      player.setVolume(70);
+      player.mute();
+    });
     await page.mouse.wheel(0, -1);
     await expect(video).toHaveJSProperty("volume", 0.01);
     await expect(video).toHaveJSProperty("muted", false);
@@ -224,6 +251,82 @@ test("wheel over the cross-origin YouTube player changes volume by 1%, clamps an
     await page.getByRole("textbox", { name: "Chat" }).hover();
     await page.mouse.wheel(0, -120);
     await expect(video).toHaveJSProperty("volume", 0);
+  } finally { await close(page); }
+});
+
+test("wheel changes survive player reconciliation and keep native mute and volume controls synchronized", async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    const frame = page.frameLocator(`${root} iframe`);
+    const video = frame.locator("video");
+    const mute = frame.getByRole("button", { name: "Mute", exact: true });
+    const volume = frame.getByRole("slider", { name: "Volume", exact: true });
+    await mute.click();
+    await expect(video).toHaveJSProperty("muted", true);
+    await video.hover();
+    await page.mouse.wheel(0, -120);
+    await expect(video).toHaveJSProperty("volume", 0.01);
+    await expect(video).toHaveJSProperty("muted", false);
+    // Replay the player's later state update, which used to restore its old mute.
+    await video.evaluate(() => window.reconcilePlayerState());
+    await expect(video).toHaveJSProperty("muted", false);
+    await expect(video).toHaveJSProperty("volume", 0.01);
+    await expect(mute).toHaveAttribute("aria-pressed", "false");
+    await expect(volume).toHaveValue("1");
+    await page.mouse.wheel(0, -120);
+    await expect(volume).toHaveValue("2");
+    await page.mouse.wheel(0, 120);
+    await expect(volume).toHaveValue("1");
+    await page.mouse.wheel(0, 120);
+    await expect(video).toHaveJSProperty("muted", true);
+    await expect(mute).toHaveAttribute("aria-pressed", "true");
+    await expect(volume).toHaveValue("0");
+    // Use the actual slider event path, then scroll from its new state.
+    await volume.fill("73");
+    await expect(video).toHaveJSProperty("volume", 0.73);
+    await video.hover();
+    await page.mouse.wheel(0, -120);
+    await expect(volume).toHaveValue("74");
+    await video.evaluate(() => window.reconcilePlayerState());
+    await expect(video).toHaveJSProperty("volume", 0.74);
+    await expect(video).toHaveJSProperty("muted", false);
+    // A normalized media volume is not necessarily the volume shown by YouTube.
+    await video.evaluate((element) => { element.volume = 0.2; });
+    await page.mouse.wheel(0, -120);
+    await expect(volume).toHaveValue("75");
+    await expect(video).toHaveJSProperty("volume", 0.75);
+  } finally { await close(page); }
+});
+
+test("wheel input waits for usable player methods without changing the media element directly", async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    const player = page.frameLocator(`${root} iframe`).locator("#movie_player");
+    const results = await player.evaluate((element) => {
+      const getVolume = element.getVolume;
+      const isMuted = element.isMuted;
+      return ["missing", "not-ready", "invalid-volume", "invalid-mute"].map((state) => {
+        element.getVolume = state === "missing" ? undefined : state === "not-ready" ? () => undefined :
+          state === "invalid-volume" ? () => NaN : getVolume;
+        element.isMuted = state === "invalid-mute" ? () => undefined : isMuted;
+        const event = new WheelEvent("wheel", { deltaY: -120, bubbles: true, cancelable: true });
+        element.querySelector("video").dispatchEvent(event);
+        const result = { prevented: event.defaultPrevented, volume: element.querySelector("video").volume };
+        element.getVolume = getVolume;
+        element.isMuted = isMuted;
+        return result;
+      });
+    });
+    assert.deepEqual(results, Array(4).fill({ prevented: false, volume: 0.5 }));
+    await player.locator("video").hover();
+    await page.mouse.wheel(0, -120);
+    await expect(player.getByRole("slider", { name: "Volume", exact: true })).toHaveValue("51");
   } finally { await close(page); }
 });
 
