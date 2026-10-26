@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { test } from "node:test";
 
-const config = readFileSync(new URL("../config.js", import.meta.url), "utf8");
-const source = readFileSync(new URL("../background.js", import.meta.url), "utf8").replace(/^import .*;\n/gm, "");
+const config = readFileSync(new URL("../../extension/config.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../extension/background.js", import.meta.url), "utf8").replace(/^import .*;\n/gm, "");
 
 function worker() {
   let listener;

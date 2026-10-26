@@ -1,6 +1,6 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { listing, player, pageJson, profileUrl, publicResponse, VIDEO } from "./fixtures.js";
+import { listing, player, pageJson, profileUrl, publicResponse, VIDEO } from "../fixtures.js";
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; delete globalThis.chrome; });
 
@@ -18,7 +18,7 @@ async function worker() {
       updateSessionRules: async ({ removeRuleIds, addRules }) => { rules = rules.filter((rule) => !removeRuleIds.includes(rule.id)).concat(addRules); },
     },
   };
-  await import(`../background.js?test=${crypto.randomUUID()}`);
+  await import(`../../extension/background.js?test=${crypto.randomUUID()}`);
   const sender = (tabId = 1) => ({ id: "test-extension", frameId: 0, tab: { id: tabId }, url: tabs.get(tabId).url });
   const message = (fields, tabId = 1) => new Promise((resolve) => listeners.message(fields, sender(tabId), resolve));
   return { message, sender, listeners, tabs, rules: () => rules };

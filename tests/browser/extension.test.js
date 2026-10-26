@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
-import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl, subscriptionScript } from "./fixtures.js";
+import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl, subscriptionScript } from "../fixtures.js";
 
-const extensionPath = fileURLToPath(new URL("../", import.meta.url));
+const extensionPath = fileURLToPath(new URL("../../extension/", import.meta.url));
 let context;
 let worker;
 const root = "#stylerz-bridge-prototype";

@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js test/*.test.js",
-    "test:unit": "node --test tests/config.test.js tests/resolver.test.js tests/background.test.js test/*.test.js",
-    "test:browser": "node scripts/subscriber-browser-smoke.mjs",
-    "check": "node --check background.js && node --check content.js && node --check subscriber.js && node --check resolver.js && node --check config.js && node --check discovery.js"
+    "test": "node --test tests/unit/*.test.js tests/browser/*.test.js",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:browser": "node --test tests/browser/*.test.js",
+    "check": "node --check extension/background.js && node --check extension/content.js && node --check extension/subscriber.js && node --check extension/resolver.js && node --check extension/config.js && node --check extension/discovery.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

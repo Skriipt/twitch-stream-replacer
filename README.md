@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/icon.svg" width="80" height="80" alt="Twitch Stream Replacer">
+  <img src="extension/assets/icon.svg" width="80" height="80" alt="Twitch Stream Replacer">
 
 # Twitch Stream Replacer
 
@@ -59,10 +59,10 @@ The extension uses Chromium Manifest V3 and requires Chrome 120 or later, or a c
 
 2. Open `chrome://extensions`, `edge://extensions` in Edge, or `brave://extensions` in Brave.
 3. Enable **Developer mode** and select **Load unpacked**.
-4. Select the project folder containing `manifest.json`.
+4. Select the repository's **`extension/` directory**, which contains `manifest.json`.
 5. Sign in to YouTube in the same browser profile, then reload the Twitch page.
 
-The [installation guide](INSTALLATION.md) covers the current prototype's controls, updates, and required cookie settings. The guide is currently in German.
+The [installation guide](docs/INSTALLATION.md) covers the current prototype's controls, updates, and required cookie settings.
 
 ## YouTube sign-in and Premium
 
@@ -84,20 +84,28 @@ The extension has no backend of its own and collects no telemetry. It does not h
 
 ## Development
 
-The project consists of JavaScript and HTML with no external runtime dependencies.
+The project consists of JavaScript and HTML with no external runtime dependencies. Only `extension/` is loaded into the browser; tests, documentation, and development dependencies stay outside it.
+
+```text
+extension/       Unpacked extension: manifest, scripts, popup, and icons
+tests/unit/      Logic and subscription lifecycle tests with mocked APIs/JSDOM
+tests/browser/   Chromium integration and runtime regression tests
+tests/fixtures.js Shared synthetic Twitch/YouTube data
+docs/            Installation, project status, and subscription design notes
+```
 
 | File | Purpose |
 | --- | --- |
-| `manifest.json` | Manifest V3 configuration, permissions, and entry points. |
-| `config.js` | Mappings between Twitch and YouTube channels. |
-| `discovery.js` | Collect creator-owned YouTube channel links from the Twitch profile. |
-| `resolver.js` | Read YouTube metadata and validate livestreams. |
-| `background.js` | Service worker, lookup cache, and per-tab network rules. |
-| `content.js` | Player replacement, menu, media controls, and channel navigation. |
-| `subscriber.js` | Read the current channel's subscription state from Twitch's committed player data. |
-| `popup.html` | Entry point through the extension's toolbar icon. |
+| `extension/manifest.json` | Manifest V3 configuration, permissions, and entry points. |
+| `extension/config.js` | Mappings between Twitch and YouTube channels. |
+| `extension/discovery.js` | Collect creator-owned YouTube channel links from the Twitch profile. |
+| `extension/resolver.js` | Read YouTube metadata and validate livestreams. |
+| `extension/background.js` | Service worker, lookup cache, and per-tab network rules. |
+| `extension/content.js` | Player replacement, menu, media controls, and channel navigation. |
+| `extension/subscriber.js` | Read the current channel's subscription state from Twitch's committed player data. |
+| `extension/popup.html` | Entry point through the extension's toolbar icon. |
 
-After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), currently in German.
+After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 ### Reproducible checks
 
@@ -109,8 +117,8 @@ npx playwright install chromium
 npm test
 ```
 
-`npm run test:unit` runs the URL, resolver, service-worker and subscription regression tests. `npm run check` checks the extension JavaScript syntax. The full suite additionally loads the actual unpacked extension in headless Chromium against controlled Twitch and YouTube fixtures. It exercises discovery, player controls, channel navigation and real Chromium session rules. These tests do not establish live YouTube playback, sign-in or Premium behaviour.
+`npm run test:unit` runs all logic and subscription lifecycle tests without launching Chromium. `npm run check` checks the extension JavaScript syntax. The full suite additionally loads the actual unpacked extension in headless Chromium against controlled Twitch and YouTube fixtures. It exercises discovery, player controls, channel navigation and real Chromium session rules. These tests do not establish live YouTube playback, sign-in or Premium behaviour.
 
-For the real Manifest V3 smoke test against synthetic Twitch/YouTube responses, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. An existing Chromium executable can be selected with `CHROMIUM_EXECUTABLE`.
+`npm run test:browser` runs all Chromium tests, including the Manifest V3 subscription smoke test with synthetic Twitch/YouTube responses. `npm test` runs both test groups. These checks use the files in `extension/` directly.
 
 An independent project with no affiliation with Twitch, YouTube, or the respective streamers.

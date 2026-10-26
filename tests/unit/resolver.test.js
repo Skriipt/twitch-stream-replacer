@@ -1,7 +1,7 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { extractJson, findLiveCandidates, validateLivePlayer, discoverLiveStream } from "../resolver.js";
-import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl, publicResponse } from "./fixtures.js";
+import { extractJson, findLiveCandidates, validateLivePlayer, discoverLiveStream } from "../../extension/resolver.js";
+import { CHANNEL, SECOND_CHANNEL, VIDEO, SECOND_VIDEO, listing, player, pageJson, profileUrl, publicResponse } from "../fixtures.js";
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 const creator = { twitchLogin: "creator", displayName: "Creator" };

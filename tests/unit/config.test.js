@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import "../config.js";
-import { CHANNEL } from "./fixtures.js";
+import "../../extension/config.js";
+import { CHANNEL } from "../fixtures.js";
 const config = globalThis.StylerzBridgeConfig;
 
 test("recognizes new Twitch creators and keeps configured identities", () => {
