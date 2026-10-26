@@ -37,6 +37,12 @@ If no public YouTube livestream is available, Twitch keeps playing. **Erneut pr√
 
 Even with automatic switching enabled, that channel then stays on Twitch in the same tab across reloads. Other channels and tabs can still switch automatically. Turn the automatic setting off and on in the toolbar popup to allow automatic switching for that channel in the tab again. Closing the tab clears this exception.
 
+## Favorites and faster switching
+
+Click the star in the panel of a channel page to mark it as a favorite (up to ten; the toolbar popup lists and removes them). Whenever a Twitch page opens, the extension checks the favorites' YouTube status in the background, at most every two minutes, so the result is ready when you open one. Favorites need a known YouTube link, which the extension remembers after the first visit to the channel; STYLERZ and ColtHavok are always known. This is the only recurring YouTube request, and only while you browse Twitch. Without favorites, the extension only looks up the channel you open.
+
+For measuring, the page records the steps of a switch (`mounted`, `subscription`, `lookup`, `switch`, `suspended`, `frame`, `loaded`, `playing`) in milliseconds since navigation start. The console prints them as `[Stream Bridge] Timing (ms)` when the YouTube player starts, and the panel's `data-timing` attribute holds them.
+
 ## Update an existing installation
 
 Replace the files in the previously loaded extension directory with the new contents of `extension/`, then select **Reload ‚Üª** on the browser's extensions page. If you previously loaded the repository root, remove that old entry and load **`extension/`** instead. Alternatively, disable the old version before loading the new directory. Keep only one version enabled, then reload Twitch.
