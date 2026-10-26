@@ -1,6 +1,6 @@
-# Project status: Stream Bridge 0.3.0
+# Project status: Stream Bridge
 
-Updated: October 26, 2026. Version 0.3.0 adds profile-based channel discovery and a compact interface to the imported 0.2.1 prototype. This document separates repository checks from historical reports and live validation limits.
+Updated: October 26, 2026. See the [changelog](../CHANGELOG.md) for the current version and [GitHub Releases](https://github.com/Skriipt/twitch-stream-replacer/releases/latest) for the extension-only download. Version 0.3.0 introduced profile-based channel discovery and a compact interface to the imported 0.2.1 prototype. This document separates repository checks from historical reports and live validation limits.
 
 ## Implemented behavior
 

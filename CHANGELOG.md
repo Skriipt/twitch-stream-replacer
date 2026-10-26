@@ -2,8 +2,12 @@
 
 ## Unreleased
 
+## 0.3.1
+
 ### Added
 
+- Downloadable extension-only ZIP and SHA-256 checksum on GitHub Releases, with the manifest at the archive root for unpacked installation.
+- Automatic release publication after successful checks on `main`, plus a version policy and checks that require an increment for every change set.
 - Favorites: star a channel in its panel (up to ten, listed and removable in the popup). Opening any Twitch page checks their YouTube status in the background, at most every two minutes, so the result is ready when a favorite is opened.
 - A timing log of the switch (`mounted`, `subscription`, `lookup`, `switch`, `suspended`, `frame`, `loaded`, `playing`) in the console and the panel's `data-timing` attribute.
 
@@ -16,6 +20,10 @@
 - Show the volume level briefly while changing it with the mouse wheel.
 - Reveal the player menu button only while the pointer moves over the video, like YouTube's own controls.
 - Omit the subscription status line from the menu during YouTube playback.
+
+### Fixed
+
+- Keep native Twitch audio paused and muted when Twitch changes volume or inserts or replaces player elements during YouTube playback.
 
 ## 0.3.0
 
