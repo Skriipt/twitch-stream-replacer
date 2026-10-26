@@ -33,7 +33,8 @@ test("a runtime lost after startup gives reload guidance when checking again", a
     try {
       await page.addInitScript(() => {
         window.chrome = { runtime: { id: "test-extension", onMessage: { addListener() {} },
-          sendMessage: async () => ({ ok: true, result: { state: "unlinked" } }) } };
+          sendMessage: async ({ type, twitchLogin }) => ({ ok: true, result: type === "SUBSCRIPTION"
+            ? { state: "not-subscribed", twitchLogin } : { state: "unlinked" } }) } };
       });
       await page.route("https://www.twitch.tv/**", (route) => route.fulfill({ contentType: "text/html", body:
         `<html><body><div class="channel-root__player" style="width:960px;height:540px"></div>${scripts.map((script) => `<script>${script}</script>`).join("")}</body></html>` }));

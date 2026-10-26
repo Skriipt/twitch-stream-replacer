@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "test:unit": "node --test tests/config.test.js tests/resolver.test.js tests/background.test.js"
+    "test": "node --test tests/*.test.js test/*.test.js",
+    "test:unit": "node --test tests/config.test.js tests/resolver.test.js tests/background.test.js test/*.test.js",
+    "test:browser": "node scripts/subscriber-browser-smoke.mjs",
+    "check": "node --check background.js && node --check content.js && node --check subscriber.js && node --check resolver.js && node --check config.js && node --check discovery.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1"
+    "@playwright/test": "^1.64.1",
+    "jsdom": "^26.1.0"
   }
 }

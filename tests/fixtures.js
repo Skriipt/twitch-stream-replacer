@@ -27,3 +27,22 @@ export function publicResponse(url, html, status = 200) {
   Object.defineProperty(response, "url", { value: url });
   return response;
 }
+
+// Committed Twitch player data for the actual MAIN-world detector, rather
+// than mocking Chrome's injection or bypassing the suspension guard.
+export function subscriptionScript(login, state = "not-subscribed") {
+  return `<script>
+    const player = document.querySelector('.channel-root__player');
+    const root = { stateNode: {}, child: { stateNode: player, memoizedProps: {} } };
+    root.stateNode.current = root;
+    root.child.return = root;
+    player.__reactFiber$fixture = root.child;
+    window.setSubscription = (state, login = ${JSON.stringify(login)}) => {
+      root.child.memoizedProps = { data: state === 'unknown' ? {} : {
+        currentUser: { id: 'fixture-viewer' },
+        user: { login, self: { subscriptionBenefit: state === 'subscribed' ? { id: 'fixture-benefit' } : null } }
+      } };
+    };
+    window.setSubscription(${JSON.stringify(state)});
+  </script>`;
+}

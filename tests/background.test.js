@@ -12,6 +12,7 @@ async function worker() {
     runtime: { id: "test-extension", onMessage: { addListener: (fn) => { listeners.message = fn; } } },
     tabs: { get: async (id) => tabs.get(id), sendMessage: async () => {},
       onUpdated: { addListener: (fn) => { listeners.updated = fn; } }, onRemoved: { addListener: (fn) => { listeners.removed = fn; } } },
+    scripting: { executeScript: async ({ args }) => [{ frameId: 0, result: { state: "not-subscribed", twitchLogin: args[0] } }] },
     declarativeNetRequest: {
       getSessionRules: async () => rules,
       updateSessionRules: async ({ removeRuleIds, addRules }) => { rules = rules.filter((rule) => !removeRuleIds.includes(rule.id)).concat(addRules); },
