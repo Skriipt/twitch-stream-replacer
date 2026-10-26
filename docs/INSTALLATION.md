@@ -21,7 +21,9 @@ The subscription guard also applies to automatic switching: an active or unknown
 
 ## Player controls
 
-During YouTube playback, a small **⋯ button in the upper-right corner** opens **Zurück zu Twitch** (Return to Twitch), **Auf YouTube öffnen** (Open on YouTube), and **YouTube-Konto & Premium** (YouTube account and Premium). The menu overlays the video without reducing its size. Close it with **×**, **Escape**, or a click in the chat.
+During YouTube playback, a small **⋯ button halfway down the right edge** opens **Zurück zu Twitch** (Return to Twitch), **Auf YouTube öffnen** (Open on YouTube), and **YouTube-Konto & Premium** (YouTube account and Premium). This keeps the button clear of YouTube's corner controls. The menu overlays the video without reducing its size. Close it with **×**, **Escape**, or a click in the chat.
+
+Hover over the YouTube player and scroll up to raise the volume or down to lower it in **1-percentage-point steps**. Volume stops at 100%; reaching 0% mutes playback, and scrolling up unmutes at 1%. The next step starts from the current volume, including changes made with YouTube's controls. Scrolling over Twitch chat or the Stream Bridge menu keeps its normal behavior. Ctrl/Command-scroll remains available for browser zoom. This control applies only to the embedded player opened by Stream Bridge.
 
 Twitch's small ad preview above chat is hidden during YouTube playback and its space is released. Leaving YouTube mode restores Twitch's own layout.
 
