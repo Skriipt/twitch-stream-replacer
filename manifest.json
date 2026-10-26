@@ -4,7 +4,8 @@
   "version": "0.3.0",
   "description": "YouTube-Livestreams über Twitch-Profillinks finden, auf Twitch ansehen und den Chat behalten. Nutzt den normalen YouTube-Player.",
   "minimum_chrome_version": "120",
-  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "icons": { "16": "assets/icon-16.png", "32": "assets/icon-32.png", "48": "assets/icon-48.png", "128": "assets/icon-128.png" },
+  "permissions": ["declarativeNetRequestWithHostAccess", "storage"],
   "host_permissions": [
     "https://www.twitch.tv/*",
     "https://www.youtube.com/*",
@@ -18,5 +19,9 @@
       "run_at": "document_end"
     }
   ],
-  "action": { "default_title": "Stream Bridge", "default_popup": "popup.html" }
+  "action": {
+    "default_title": "Stream Bridge",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "assets/icon-16.png", "32": "assets/icon-32.png", "48": "assets/icon-48.png", "128": "assets/icon-128.png" }
+  }
 }

@@ -42,7 +42,9 @@ New creators no longer need a source-code mapping when their Twitch profile link
 
 Discovery uses the profile and panels currently loaded on the Twitch page. If no channel link is found, open the channel's **About / Info** section; links loaded later are checked automatically. Chat links and recommendations are excluded. Short video links, link aggregators and name-based search are outside this first version. There is no periodic background polling; use **Erneut prüfen** to check whether a broadcast has started since the last lookup.
 
-Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly. Finding a stream never switches playback automatically.
+Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly.
+
+Open the extension's toolbar popup and enable **Automatisch zu YouTube** to switch automatically when a single verified livestream is found. The setting is off by default, is saved locally in the browser profile, and applies to all Twitch tabs, including tabs already open. Turning it off leaves an existing YouTube player running and makes future switches manual. It does not add background polling. **Zurück zu Twitch** keeps that channel on Twitch in the current tab across reloads; switching the automatic setting off and on allows automatic playback there again.
 
 ## Installation
 
@@ -75,6 +77,7 @@ The regular YouTube player uses the browser profile's YouTube session. The exten
 | `www.twitch.tv` | Identify the channel and insert the controls and player. |
 | `www.youtube.com` | Fetch channel and stream metadata. |
 | `*.ttvnw.net` and `declarativeNetRequestWithHostAccess` | Temporarily block Twitch video requests in the relevant tab. |
+| `storage` | Save the automatic playback preference locally and remember a tab's deliberate return to Twitch for the browser session. |
 
 The extension has no backend of its own and collects no telemetry. It does not have permission to read cookies. The browser may attach its existing YouTube session to requests; the embedded player connects directly to YouTube.
 
@@ -90,7 +93,8 @@ The project consists of JavaScript and HTML with no external runtime dependencie
 | `resolver.js` | Read YouTube metadata and validate livestreams. |
 | `background.js` | Service worker, lookup cache, and per-tab network rules. |
 | `content.js` | Player replacement, menu, media controls, and channel navigation. |
-| `popup.html` | Entry point through the extension's toolbar icon. |
+| `popup.html`, `popup.js` | Toolbar popup with instructions and the saved automatic playback switch. |
+| `assets/icon.svg` | Editable Stream Bridge mark; `npm run icons` regenerates the packaged PNG sizes. |
 
 After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), currently in German.
 

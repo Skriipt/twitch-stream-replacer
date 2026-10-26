@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#dc2626"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">TS</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Stream Bridge</title>
+  <rect width="64" height="64" rx="14" fill="#18181B"/>
+  <path d="M12 46V31C12 23.268 18.268 17 26 17H32" stroke="#A78BFA" stroke-width="8" stroke-linecap="round"/>
+  <path d="M32 17H38C45.732 17 52 23.268 52 31V46" stroke="#FF655C" stroke-width="8" stroke-linecap="round"/>
+  <path d="M26 27C26 25.46 27.667 24.498 29 25.268L42 32.774C43.333 33.544 43.333 35.468 42 36.238L29 43.744C27.667 44.514 26 43.552 26 42.012V27Z" fill="#FAFAFA"/>
 </svg>
