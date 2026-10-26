@@ -32,9 +32,17 @@ The intended feature set includes:
 ## How it works
 
 1. The extension identifies the Twitch channel being viewed.
-2. It checks the associated YouTube channel for an active livestream.
+2. It reads YouTube channel links from the creator's loaded Twitch profile and info panels, then checks the linked channels for an active livestream. The two original configured channels remain available as fallbacks.
 3. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
 4. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
+
+### Automatic discovery in 0.3.0
+
+New creators no longer need a source-code mapping when their Twitch profile links to a YouTube channel. Handle (`/@name`), channel ID (`/channel/UC…`), and legacy `/c/`, `/user/` and bare custom-name links are supported. The extension verifies YouTube's channel ID and live player metadata before offering playback.
+
+Discovery uses the profile and panels currently loaded on the Twitch page. If no channel link is found, open the channel's **About / Info** section; links loaded later are checked automatically. Chat links and recommendations are excluded. Short video links, link aggregators and name-based search are outside this first version. There is no periodic background polling; use **Erneut prüfen** to check whether a broadcast has started since the last lookup.
+
+Up to five distinct linked channel URLs are checked. If multiple channels are live, or a linked channel cannot be verified, Twitch keeps playing and the extension asks you to check YouTube directly. Finding a stream never switches playback automatically.
 
 ## Installation
 
@@ -78,11 +86,24 @@ The project consists of JavaScript and HTML with no external runtime dependencie
 | --- | --- |
 | `manifest.json` | Manifest V3 configuration, permissions, and entry points. |
 | `config.js` | Mappings between Twitch and YouTube channels. |
+| `discovery.js` | Collect creator-owned YouTube channel links from the Twitch profile. |
 | `resolver.js` | Read YouTube metadata and validate livestreams. |
 | `background.js` | Service worker, lookup cache, and per-tab network rules. |
 | `content.js` | Player replacement, menu, media controls, and channel navigation. |
 | `popup.html` | Entry point through the extension's toolbar icon. |
 
 After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), currently in German.
+
+### Reproducible checks
+
+Node.js 24 is used in CI. Development dependencies are used only for testing; the unpacked extension still needs no build step.
+
+```sh
+npm ci
+npx playwright install chromium
+npm test
+```
+
+`npm run test:unit` runs the URL, resolver and service-worker tests. The full suite additionally loads the actual unpacked extension in headless Chromium against controlled Twitch and YouTube fixtures. It exercises discovery, player controls, channel navigation and real Chromium session rules. These tests do not establish live YouTube playback, sign-in or Premium behaviour.
 
 An independent project with no affiliation with Twitch, YouTube, or the respective streamers.

@@ -1,5 +1,5 @@
 import "./config.js";
-import { resolveLiveStream } from "./resolver.js";
+import { discoverLiveStream } from "./resolver.js";
 
 const CONFIG = globalThis.StylerzBridgeConfig;
 const cached = new Map();
@@ -10,13 +10,18 @@ function isChannel(url) {
   return Boolean(CONFIG.channelForUrl(url));
 }
 
-async function lookup(channel, force = false) {
-  const key = channel.twitchLogin;
+async function lookup(channel, force = false, links = []) {
+  // The DOM is untrusted input; only canonical YouTube channel URLs may leave
+  // the worker. Include links in the cache key as panels can load late/change.
+  const urls = [...new Set((Array.isArray(links) ? links : []).filter((url) => typeof url === "string")
+    .map(CONFIG.youtubeChannelUrl).filter(Boolean))].sort();
+  if (urls.length > 5) throw new Error("Zu viele YouTube-Kanäle verlinkt. Bitte direkt auf YouTube auswählen.");
+  const key = JSON.stringify([channel.twitchLogin, urls]);
   const previous = cached.get(key);
   if (!force && previous && Date.now() - previous.checkedAt < 30_000) return previous;
   if (!pending.has(key)) {
-    pending.set(key, resolveLiveStream(channel).then((result) => {
-      const value = { ...result, twitchLogin: key, checkedAt: Date.now() };
+    pending.set(key, discoverLiveStream(channel, urls).then((result) => {
+      const value = { ...result, twitchLogin: channel.twitchLogin, checkedAt: Date.now() };
       cached.set(key, value);
       return value;
     }).finally(() => { pending.delete(key); }));
@@ -64,7 +69,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const tab = await chrome.tabs.get(sender.tab.id);
       const channel = CONFIG.channelForUrl(tab.url);
       if (!channel || channel.twitchLogin !== message.twitchLogin) throw new Error("Der Twitch-Kanal hat sich geändert. Bitte erneut prüfen.");
-      return lookup(channel, message.force === true);
+      return lookup(channel, message.force === true, message.youtubeLinks);
     }
     if (message?.type === "SUSPEND") {
       await setSuspended(sender.tab.id, true, message.twitchLogin);

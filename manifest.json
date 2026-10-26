@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Stream Bridge · Prototyp",
-  "version": "0.2.1",
-  "description": "STYLERZ und ColtHavok auf YouTube ansehen und den Twitch-Chat behalten. Nutzt den normalen YouTube-Player und deine Browser-Anmeldung.",
+  "version": "0.3.0",
+  "description": "YouTube-Livestreams über Twitch-Profillinks finden, auf Twitch ansehen und den Chat behalten. Nutzt den normalen YouTube-Player.",
   "minimum_chrome_version": "120",
   "permissions": ["declarativeNetRequestWithHostAccess"],
   "host_permissions": [
@@ -14,7 +14,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.twitch.tv/*"],
-      "js": ["config.js", "content.js"],
+      "js": ["config.js", "discovery.js", "content.js"],
       "run_at": "document_idle"
     }
   ],

@@ -1,6 +1,25 @@
-# Projektstand: Stream Bridge 0.2.1
+# Projektstand: Stream Bridge 0.3.0
 
-Stand: 26. Oktober 2026. Ausgangspunkt dieses Repositorys sind die sieben Dateien des bereitgestellten Release-Ordners `stream-bridge-prototype-0.2.1`. Der Erweiterungscode wurde bei der Übernahme unverändert kopiert. README, Projektzusammenfassung, Git-Konfiguration und das vorhandene Projekt-Icon wurden ergänzt.
+Stand: 26. Oktober 2026. Version 0.3.0 baut auf dem unverändert übernommenen Prototyp 0.2.1 auf und ergänzt automatische Kanalzuordnung sowie eine kompaktere Oberfläche. Die folgende Historie trennt frühere Prüfberichte von den jetzt reproduzierbaren Checks.
+
+## Neu in 0.3.0
+
+- Weitere Twitch-Kanäle werden über direkte YouTube-Kanallinks im geladenen Profil und in den Infopanels zugeordnet. Unterstützt werden Handles, Kanal-IDs und ältere Kanal-URLs. Die beiden bisherigen festen Zuordnungen bleiben erhalten.
+- Die Erkennung berücksichtigt nachgeladene Links und verwirft alte Ergebnisse nach Kanal- oder Linkwechseln. Twitch-Kanalüberschrift und vorhandene Profilüberschrift müssen zum aktuellen Kanal passen. Chatlinks und Empfehlungen bleiben außen vor.
+- YouTube-Kanal-ID, Live-Status und Einbettbarkeit werden geprüft. Bis zu fünf unterschiedliche Kanal-URLs sind möglich. Bei mehreren live sendenden Kanälen oder einer fehlgeschlagenen Prüfung wird kein Player ausgewählt. Der Wechsel bleibt manuell.
+- Das dunkle Panel ist kleiner und einklappbar. Der aktive Player behält die ganze Videofläche; das ⋯-Menü bleibt über dem Video. Das Popup erklärt die Erkennung und die YouTube-Anmeldung.
+
+### Aktuelle Prüfungen
+
+`npm test`: **26/26 bestanden**, davon 20 Logiktests und sechs Chromium-Integrationstests mit tatsächlich geladener Manifest-V3-Erweiterung. Die Integrationstests verwenden kontrollierte Twitch-/YouTube-Fixtures und echte Chromium-Session-Regeln. Abgedeckt sind nachgeladene Profillinks, mehrdeutige und beendete Streams, Änderungen während einer laufenden Suche, Kanalwechsel mit veraltetem Profil, zwei gleichzeitige Tabs, Playergröße, Einklappen, Tastaturbedienung, Menüs und Rückkehr zu Twitch.
+
+Die Oberfläche wurde zusätzlich anhand von Chromium-Screenshots bei normaler und kleiner Playergröße sowie im Popup visuell geprüft. Ein öffentlicher Twitch-Info-Bereich wurde live auf seine DOM-Struktur geprüft; dabei wurden die tatsächlich verwendeten Kanalüberschriften und eine ältere YouTube-Kanal-URL in die Erkennung aufgenommen. Der öffentliche YouTube-Resolver bestätigte den verlinkten Kanal bei einer separaten Node-Abfrage als offline.
+
+Ein weiterer Versuch mit der geladenen Erweiterung auf der echten Twitch-Seite erkannte den Profillink, konnte YouTube im frischen Chromium-Profil jedoch nicht erreichen. Damit sind **echte YouTube-Wiedergabe, Premium-Anmeldung und Twitch-Werbepausen für 0.3.0 nicht live bestätigt**. Der erfolgreiche Offline-Metadatenabruf in Node ersetzt diese Prüfung nicht.
+
+### Grenzen der ersten Erkennung
+
+Es werden nur direkte Kanal-URLs im aktuell geladenen Profil ausgewertet. Bei fehlenden Links hilft der Info-/About-Bereich. Namenssuche, Link-Aggregatoren, Videolinks und eine dauernde Hintergrundabfrage sind nicht implementiert. Ein neuer Stream nach einer abgeschlossenen Suche wird über **Erneut prüfen** gesucht. Die Erkennung benötigt keine zusätzlichen Berechtigungen, kein Backend und keinen API-Schlüssel.
 
 ## Zusammenfassung der bisherigen Entwicklung
 
@@ -24,7 +43,6 @@ Bei der Repository-Übernahme wurden alle sieben Release-Dateien per SHA-256 mit
 
 - Version 0.2.1 unter echten Twitch-Werbepausen und mit dem verwendeten YouTube-Premium-Profil praktisch bestätigen.
 - Manuelle Zeitanpassung des YouTube-Streams und spätere Synchronisationshilfen untersuchen.
-- Weitere Kanalzuordnungen und eine Oberfläche für deren Verwaltung ergänzen.
-- Ursprüngliche Tests und Fixtures wiederherstellen oder eine reproduzierbare Testsuite aufbauen.
+- Automatische Zuordnung über weitere Quellen und eine Oberfläche für manuelle Zuordnungen untersuchen.
 
 Die aktuell implementierten Funktionen und die Installation beschreibt die [README](../README.md).

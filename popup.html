@@ -4,13 +4,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stream Bridge</title>
 <style>
-  body { width:310px; margin:0; padding:18px; background:#19171f; color:#f4f1fa; font:14px/1.5 system-ui,sans-serif; }
-  h1 { margin:0; font-size:18px; } p { margin:12px 0; } a { color:#dec7ff; } small { color:#c7bdcf; }
+  :root { color-scheme:dark; --ground:#18181b; --raised:#232328; --ink:#efeff1; --muted:#b4b4bd; }
+  * { box-sizing:border-box; }
+  body { width:320px; margin:0; padding:16px 16px 14px; background:var(--ground); color:var(--ink); font:13.5px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  h1 { margin:0; font-size:17px; line-height:1.25; }
+  h2 { margin:0 0 6px; font-size:13.5px; }
+  p { margin:0; }
+  .lead { margin-top:4px; color:var(--muted); }
+  section { margin-top:14px; padding:10px 12px; border-radius:6px; background:var(--raised); }
+  ol { margin:0; padding-left:18px; }
+  li + li { margin-top:4px; }
+  .note { margin-top:12px; color:var(--muted); font-size:12.5px; }
+  a { color:var(--ink); text-underline-offset:3px; text-decoration-color:#efeff166; }
+  a:hover { text-decoration-color:currentColor; }
+  a:focus-visible { outline:2px solid #fff; outline-offset:2px; border-radius:2px; }
 </style>
 <h1>Stream Bridge</h1>
-<p>Prototyp für YouTube-Video mit Twitch-Chat.</p>
-<p><a href="https://www.twitch.tv/stylerz" target="_blank" rel="noopener">STYLERZ auf Twitch öffnen ↗</a></p>
-<p><a href="https://www.twitch.tv/colthavok" target="_blank" rel="noopener">ColtHavok auf Twitch öffnen ↗</a></p>
-<p><a href="https://www.youtube.com/" target="_blank" rel="noopener">YouTube-Premium-Konto prüfen ↗</a></p>
-<small>Im selben Browserprofil bei YouTube anmelden. Auf Twitch erscheint der Umschalter im Videobereich. Premium wird vom Add-on nicht automatisch geprüft.</small>
+<p class="lead">YouTube-Livestream im Twitch-Player ansehen, Twitch-Chat behalten. Prototyp.</p>
+<section aria-labelledby="how">
+  <h2 id="how">So funktioniert’s</h2>
+  <ol>
+    <li>Eine Twitch-Kanalseite öffnen.</li>
+    <li>Das Add-on sucht im Twitch-Profil nach einem verlinkten YouTube-Kanal und prüft, ob er gerade live ist.</li>
+    <li>Im Twitch-Player erscheint ein kleines Feld. „YouTube ansehen“ tauscht das Video, der Chat bleibt.</li>
+  </ol>
+</section>
+<p class="note">Kein YouTube-Link im Profil? Dann bleibt Twitch unverändert. Premium nutzt deine YouTube-Anmeldung in diesem Browserprofil und wird nicht automatisch geprüft. <a href="https://www.youtube.com/" target="_blank" rel="noopener">YouTube öffnen ↗</a></p>
 </html>
