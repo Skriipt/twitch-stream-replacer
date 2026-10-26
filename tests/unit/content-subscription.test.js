@@ -23,8 +23,9 @@ async function page(t, initial = "not-subscribed", intercepted, settings) {
   let routeMessage;
   let paused = 0;
   const intervals = new Map();
+  const timeouts = [];
   const calls = [];
-  window.setTimeout = (fn) => { queueMicrotask(fn); return 1; };
+  window.setTimeout = (fn, delay) => { timeouts.push(delay); queueMicrotask(fn); return 1; };
   window.setInterval = (fn) => { const id = Symbol(); intervals.set(id, fn); return id; };
   window.clearInterval = (id) => { intervals.delete(id); };
   window.HTMLMediaElement.prototype.pause = () => { paused++; };
@@ -48,7 +49,7 @@ async function page(t, initial = "not-subscribed", intercepted, settings) {
   window.eval(source);
   await flush();
   return {
-    window, calls, errors, intervals, get paused() { return paused; },
+    window, calls, errors, intervals, timeouts, get paused() { return paused; },
     get shadow() { return window.document.getElementById("stylerz-bridge-prototype")?.shadowRoot; },
     set state(value) { state = value; },
     intercept(fn) { handler = fn; },
@@ -80,6 +81,67 @@ test("non-subscribers retain the existing manual replacement", async (t) => {
   assert.equal(p.window.document.documentElement.hasAttribute("data-stream-bridge-active"), true);
   assert.ok(p.calls.some((call) => call.type === "SUSPEND"));
   assert.ok(p.paused > 0);
+});
+
+test("Twitch cannot undo the mute after the replacement without a DOM change", async (t) => {
+  const p = await page(t);
+  await p.click("watch");
+  const video = p.window.document.querySelector("video");
+  assert.equal(video.muted, true);
+  video.muted = false;
+  video.dispatchEvent(new p.window.Event("volumechange"));
+  assert.equal(video.muted, true, "a late Twitch volume update must not restore native audio");
+});
+
+test("native audio guards leave unrelated media alone and release the original mute on navigation", async (t) => {
+  const p = await page(t);
+  const native = p.window.document.querySelector("video");
+  const preview = p.window.document.createElement("div");
+  preview.className = "picture-by-picture-player";
+  preview.innerHTML = '<audio muted></audio>';
+  p.window.document.body.append(preview);
+  const audio = preview.querySelector("audio");
+  audio.muted = true;
+  await p.click("watch");
+  const unrelated = p.window.document.createElement("video");
+  p.window.document.body.append(unrelated);
+  for (const type of ["play", "playing", "volumechange"]) {
+    for (const media of [native, audio]) {
+      media.muted = false;
+      const before = p.paused;
+      media.dispatchEvent(new p.window.Event(type));
+      assert.equal(media.muted, true, type);
+      assert.ok(p.paused > before, `${type} stops native playback`);
+    }
+    unrelated.dispatchEvent(new p.window.Event(type));
+    assert.equal(unrelated.muted, false, "unrelated page media is not muted");
+  }
+  await p.navigate("/directory");
+  assert.equal(native.muted, false, "initially audible media is restored");
+  assert.equal(audio.muted, true, "initially muted media stays muted");
+  for (const media of [native, audio]) {
+    media.muted = false;
+    const before = p.paused;
+    media.dispatchEvent(new p.window.Event("playing"));
+    media.dispatchEvent(new p.window.Event("volumechange"));
+    assert.equal(media.muted, false, "the guard is inactive after navigation");
+    assert.equal(p.paused, before);
+  }
+});
+
+test("audio protection adds no timer or lookup between suspension and mounting YouTube", async (t) => {
+  const p = await page(t);
+  let timersAtSuspension;
+  p.intercept((message) => {
+    if (message.type === "SUSPEND") timersAtSuspension = p.timeouts.length;
+  });
+  await p.click("watch");
+  assert.ok(p.shadow.getElementById("youtube"));
+  assert.equal(p.timeouts.length, timersAtSuspension, "YouTube mounts without another timer");
+  const messages = p.calls.length;
+  p.window.document.querySelector("video").dispatchEvent(new p.window.Event("volumechange"));
+  await flush();
+  assert.equal(p.calls.length, messages, "audio enforcement makes no background request");
 });
 
 test("unknown/loading data blocks replacement and recovers when Twitch data arrives", async (t) => {

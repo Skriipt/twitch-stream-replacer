@@ -205,7 +205,9 @@
 
   function silence(video) {
     if (!mutedVideos.has(video)) mutedVideos.set(video, video.muted);
-    video.muted = true;
+    // Setting muted queues volumechange even if it was already true. Keep
+    // this idempotent because volumechange also enforces the native mute.
+    if (!video.muted) video.muted = true;
     video.pause();
   }
 
@@ -657,13 +659,21 @@
     if (!root?.isConnected || !mount?.isConnected ||
         (active && records.some((record) => mount.contains(record.target) ||
           record.target instanceof Element && record.target.closest(PREVIEW_SELECTOR) ||
-          [...record.addedNodes].some((node) => node instanceof Element && (node.matches(PREVIEW_SELECTOR) || node.querySelector(PREVIEW_SELECTOR)))))) schedule();
+          [...record.addedNodes].some((node) => node instanceof Element && (node.matches(PREVIEW_SELECTOR) || node.querySelector(PREVIEW_SELECTOR)))))) {
+      // A newly inserted player can already be playing. Silence it in this
+      // mutation delivery, without the normal 100 ms discovery debounce.
+      if (active) reconcile();
+      else schedule();
+    }
   });
   observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["href"] });
-  document.addEventListener("play", (event) => {
+  function guardNativeAudio(event) {
     if (active && event.target instanceof HTMLMediaElement &&
         (mount?.contains(event.target) || event.target.closest(PREVIEW_SELECTOR))) silence(event.target);
-  }, true);
+  }
+  // Twitch can reapply volume after play, or finish resuming later. Media
+  // properties do not trigger the DOM observer; catch their own events.
+  for (const type of ["play", "playing", "volumechange"]) document.addEventListener(type, guardNativeAudio, true);
   window.addEventListener("message", (event) => {
     const frame = shadow?.getElementById("youtube");
     if (event.origin !== "https://www.youtube.com" || !frame || event.source !== frame.contentWindow) return;

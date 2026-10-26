@@ -29,6 +29,19 @@ The service worker starts the YouTube lookup when a Twitch channel tab starts lo
 
 Favorites (up to ten Twitch logins, `favorites` in `chrome.storage.local`) are looked up whenever a Twitch page opens and at most every two minutes, three at a time and after the opened channel's own lookup. Entries without a known YouTube link are skipped. Extra traffic is one `/streams` request per offline favorite and one more for a live one. The page also records a timing log of each switch (`data-timing`, console line `[Stream Bridge] Timing (ms)`); the embed reports its first `playing` frame to the Twitch page. These timings were not collected against live Twitch/YouTube in this change.
 
+## Native audio audit
+
+During replacement, YouTube owns playback and native Twitch video/audio must stay muted and paused. Two gaps were reproduced before the fix:
+
+- A late `muted` or volume property update did not trigger either DOM reconciliation or the existing `play` guard. A unit regression reproduced Twitch undoing the mute without a DOM change.
+- An already-playing media element inserted into the native player or picture-by-picture preview waited for the 100 ms reconciliation debounce. The loaded extension in Chromium reproduced an unmuted, unpaused audio source immediately after insertion, using a real oscillator-backed `MediaStream` rather than a mocked `play()` method.
+
+The native guard now handles `play`, `playing`, and `volumechange`. Mute writes are conditional to avoid generating an endless stream of corrective `volumechange` events. Relevant mutations during replacement reconcile immediately, including replacement of the entire native player container; initial discovery retains its existing debounce. The tab's network rule still blocks future Twitch media requests, while the media guard handles playback already available to the page.
+
+Regression checks cover main-player/preview insertion and container replacement before any timer runs, repeated real Chromium volume changes with bounded event counts, native mute restoration on navigation, and isolation from unrelated page media and YouTube mute controls. A unit check also verifies no new timer between successful suspension and iframe mounting and no extension messages during audio enforcement. The fix adds no lookup, network wait, or polling interval to the switch path; live end-to-end switching latency was not measured.
+
+Run `node --test --test-name-pattern='native audio|late native' tests/browser/extension.test.js` and `node --test tests/unit/content-subscription.test.js` for the focused checks. These reproduce browser media lifecycle behavior with controlled Twitch/YouTube pages. They do not confirm authenticated live playback, real Twitch ad behavior, or the exact sequence behind an individual reported occurrence. YouTube autoplay restrictions remain under browser/player control; the extension does not force YouTube to unmute.
+
 ## Reproducible repository checks
 
 Run these commands from the repository root after installing the development dependencies:

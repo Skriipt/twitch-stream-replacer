@@ -182,6 +182,82 @@ test("loaded extension discovers late profile links, switches video and preserve
   await close(page);
 });
 
+for (const destination of ["player", "preview", "replacement"]) test(`native audio inserted into ${destination} is silenced before delayed reconciliation`, async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    await expect(page.locator(`${root} iframe`)).toBeVisible();
+    const state = await page.evaluate(async (destination) => {
+      // Real, locally generated audio: play before attaching so no document
+      // play event can hide the gap in the MutationObserver's delayed scan.
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      const output = audioContext.createMediaStreamDestination();
+      oscillator.connect(output);
+      oscillator.start();
+      await audioContext.resume();
+      const audio = new Audio();
+      audio.srcObject = output.stream;
+      await audio.play();
+      const before = { muted: audio.muted, paused: audio.paused };
+      const container = document.querySelector(destination === 'preview' ? '.picture-by-picture-player' : '.channel-root__player');
+      // Keep the observation within the same task as the DOM mutation, after
+      // its microtask delivery, rather than waiting for the 100 ms scan.
+      if (destination === 'replacement') {
+        const replacement = document.createElement('div');
+        replacement.className = 'channel-root__player';
+        replacement.append(audio);
+        container.replaceWith(replacement);
+      } else container.append(audio);
+      await new Promise(queueMicrotask);
+      const after = { muted: audio.muted, paused: audio.paused };
+      audio.pause();
+      audio.remove();
+      oscillator.stop();
+      output.stream.getTracks().forEach((track) => track.stop());
+      await audioContext.close();
+      return { before, after };
+    }, destination);
+    assert.deepEqual(state.before, { muted: false, paused: false }, "the native source really started");
+    assert.deepEqual(state.after, { muted: true, paused: true }, "an inserted native source must not leak audio for 100 ms");
+  } finally { await close(page); }
+});
+
+test("late native volume updates stay muted without an event loop or affecting YouTube", async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    await addLinks(page);
+    await page.locator(`${root} #watch`).click();
+    const frame = page.frameLocator(`${root} iframe`);
+    await expect(frame.locator("video")).toHaveJSProperty("muted", false);
+    const state = await page.locator(".channel-root__player > video").evaluate(async (video) => {
+      let events = 0;
+      video.addEventListener('volumechange', () => { events++; });
+      // Let the browser dispatch real property-change events, without
+      // dispatchEvent, DOM changes, or the debounced reconciliation.
+      for (let i = 0; i < 10; i++) {
+        const changed = new Promise((resolve) => video.addEventListener('volumechange', resolve, { once: true }));
+        video.muted = false;
+        video.volume = (i + 1) / 10;
+        await changed;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return { muted: video.muted, paused: video.paused, events };
+    });
+    assert.equal(state.muted, true);
+    assert.equal(state.paused, true);
+    assert.ok(state.events >= 20 && state.events <= 30, `bounded volumechange events: ${state.events}`);
+    await expect(frame.locator("video")).toHaveJSProperty("muted", false);
+    await frame.getByRole("button", { name: "Mute", exact: true }).click();
+    await expect(frame.locator("video")).toHaveJSProperty("muted", true);
+    await frame.getByRole("button", { name: "Mute", exact: true }).click();
+    await expect(frame.locator("video")).toHaveJSProperty("muted", false);
+  } finally { await close(page); }
+});
+
 test("collapsed panel is remembered across reloads, channels and tabs", async () => {
   await mockYouTube(routes());
   const first = await open("collapsefirst");
