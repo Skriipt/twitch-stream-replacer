@@ -1,58 +1,68 @@
-# Projektstand: Stream Bridge 0.3.0
+# Project status: Stream Bridge 0.3.0
 
-Stand: 26. Oktober 2026. Version 0.3.0 baut auf dem unverändert übernommenen Prototyp 0.2.1 auf und ergänzt automatische Kanalzuordnung sowie eine kompaktere Oberfläche. Die folgende Historie trennt frühere Prüfberichte von den jetzt reproduzierbaren Checks.
+Updated: October 26, 2026. Version 0.3.0 adds profile-based channel discovery and a compact interface to the imported 0.2.1 prototype. This document separates repository checks from historical reports and live validation limits.
 
-## Neu in 0.3.0
+## Implemented behavior
 
-- Weitere Twitch-Kanäle werden über direkte YouTube-Kanallinks im geladenen Profil und in den Infopanels zugeordnet. Unterstützt werden Handles, Kanal-IDs und ältere Kanal-URLs. Die beiden bisherigen festen Zuordnungen bleiben erhalten.
-- Die Erkennung berücksichtigt nachgeladene Links und verwirft alte Ergebnisse nach Kanal- oder Linkwechseln. Twitch-Kanalüberschrift und vorhandene Profilüberschrift müssen zum aktuellen Kanal passen. Chatlinks und Empfehlungen bleiben außen vor.
-- YouTube-Kanal-ID, Live-Status und Einbettbarkeit werden geprüft. Bis zu fünf unterschiedliche Kanal-URLs sind möglich. Bei mehreren live sendenden Kanälen oder einer fehlgeschlagenen Prüfung wird kein Player ausgewählt. Der Wechsel ist standardmäßig manuell.
-- Das dunkle Panel ist kleiner und einklappbar. Der aktive Player behält die ganze Videofläche; das ⋯-Menü bleibt über dem Video. Das Popup erklärt die Erkennung und die YouTube-Anmeldung.
+- Direct YouTube channel links in the loaded Twitch profile and info panels identify additional creators. Handles, channel IDs, and legacy channel URLs are supported; the original STYLERZ and ColtHavok fallback mappings remain available.
+- Discovery handles links loaded after navigation and discards stale results after channel or link changes. Twitch channel and profile headings must match the current channel. Chat links and recommendations are excluded.
+- The resolver verifies channel identity, live status, and embedding support for up to five distinct channel URLs. Multiple live channels or a failed check leave Twitch playing.
+- A compact, collapsible panel and an overlay menu preserve the full player area. The toolbar popup explains discovery and YouTube sign-in.
+- The subscription guard keeps Twitch playback for active channel subscribers. Missing or uncertain player data blocks replacement; see [subscription detection](SUBSCRIBER_DETECTION.md) for the state contract and evidence.
 
-### Automatik und Erweiterungsicon
+Discovery only reads direct channel URLs in the currently loaded profile. Open **About / Info** when links are missing. Name-based search, link aggregators, individual video links, and periodic YouTube discovery polling are not implemented. **Erneut prüfen** (Check again) starts a new lookup after a previous one finishes.
 
-Das externe Menü bietet jetzt den lokal gespeicherten Schalter **Automatisch zu YouTube**. Er ist standardmäßig aus und wirkt auf alle Twitch-Tabs. Die automatische Wiedergabe verwendet dieselbe erneute Live-Prüfung wie ein manueller Wechsel. Ausschalten während einer laufenden Prüfung oder Umschaltung verhindert die Aktivierung; bestehende YouTube-Player laufen weiter. Eine bewusste Rückkehr zu Twitch bleibt für diesen Kanal im selben Tab über Neuladungen erhalten, bis die Automatik erneut eingeschaltet oder der Tab geschlossen wird. Die Einstellung benötigt zusätzlich die Berechtigung `storage`.
+## Automatic switching and extension icons
 
-Das neue Brückenmotiv mit Play-Symbol ersetzt den bisherigen Platzhalter. SVG-Quelle und PNGs in 16, 32, 48 und 128 Pixeln liegen im Repository; `npm run icons` erzeugt die PNGs reproduzierbar mit Chromium.
+The toolbar popup provides **Automatisch zu YouTube** (Automatically switch to YouTube), a locally saved preference that is off by default and applies to all Twitch tabs. Automatic playback repeats the live and subscription checks used for manual switching. Turning it off while a lookup or switch is pending prevents activation; existing YouTube players continue playing. A deliberate return to Twitch persists for that channel in the same tab across reloads until automatic switching is enabled again or the tab closes. The setting requires the `storage` permission.
 
-Die Automatik berücksichtigt den Abo-Schutz: Bei aktivem oder unklarem Kanal-Abo wird nicht gewechselt. Die Chromium-Tests prüfen beide Zustände und die anschließende Freigabe ohne Abo. Es werden keine zusätzlichen YouTube-Hintergrundabfragen eingeführt; die bestehende Abo-Prüfung bleibt erhalten.
+The bridge and play-symbol icon replaces the original placeholder. Its editable SVG source and packaged PNGs at 16, 32, 48, and 128 pixels live in `extension/assets/`. Run `npm run icons` to regenerate the PNGs using Chromium.
 
-Aktuelle Prüfung nach Integration des Abo-Schutzes: `npm test` **62/62 bestanden**, `npm run check` bestanden und `npm run test:browser` mit allen vier MV3-/MAIN-World-Smoke-Prüfungen bestanden. Die geladene Erweiterung wurde zusätzlich auf gespeicherte Einstellung, Tastaturbedienung, mehrere Tabs, Rückkehr zu Twitch und Ausschalten während laufender Suche beziehungsweise Netzwerksperre geprüft. Popup und Icon wurden visuell geprüft. Die Browsernachweise verwenden kontrollierte Fixtures; eine neue Live-Prüfung von Twitch-/YouTube-Wiedergabe wurde für diese Änderung nicht durchgeführt.
+Automatic switching keeps Twitch playing for active or unknown subscription states. It introduces no additional YouTube polling; the existing subscription checks remain in place.
 
-### Frühere Prüfungen der Kanalerkennung
+## Reproducible repository checks
 
-`npm test`: **26/26 bestanden**, davon 20 Logiktests und sechs Chromium-Integrationstests mit tatsächlich geladener Manifest-V3-Erweiterung. Die Integrationstests verwenden kontrollierte Twitch-/YouTube-Fixtures und echte Chromium-Session-Regeln. Abgedeckt sind nachgeladene Profillinks, mehrdeutige und beendete Streams, Änderungen während einer laufenden Suche, Kanalwechsel mit veraltetem Profil, zwei gleichzeitige Tabs, Playergröße, Einklappen, Tastaturbedienung, Menüs und Rückkehr zu Twitch.
+Run these commands from the repository root after installing the development dependencies:
 
-Die Oberfläche wurde zusätzlich anhand von Chromium-Screenshots bei normaler und kleiner Playergröße sowie im Popup visuell geprüft. Ein öffentlicher Twitch-Info-Bereich wurde live auf seine DOM-Struktur geprüft; dabei wurden die tatsächlich verwendeten Kanalüberschriften und eine ältere YouTube-Kanal-URL in die Erkennung aufgenommen. Der öffentliche YouTube-Resolver bestätigte den verlinkten Kanal bei einer separaten Node-Abfrage als offline.
+```sh
+npm ci
+npx playwright install chromium
+npm run check
+npm test
+```
 
-Ein weiterer Versuch mit der geladenen Erweiterung auf der echten Twitch-Seite erkannte den Profillink, konnte YouTube im frischen Chromium-Profil jedoch nicht erreichen. Damit sind **echte YouTube-Wiedergabe, Premium-Anmeldung und Twitch-Werbepausen für 0.3.0 nicht live bestätigt**. Der erfolgreiche Offline-Metadatenabruf in Node ersetzt diese Prüfung nicht.
+`npm run test:unit` covers URL normalization, resolver validation, background messages and network rules, subscription detection, and the content-script subscription lifecycle with mocked APIs and JSDOM.
 
-### Grenzen der ersten Erkennung
+`npm run test:browser` covers runtime failure handling and the actual unpacked Manifest V3 extension in Chromium against controlled Twitch/YouTube responses. It exercises delayed profile links, ambiguous and ended streams, pending lookup changes, stale profiles during navigation, multiple tabs, player sizing, keyboard and menu controls, subscription checks in the page's `MAIN` world, restoration of Twitch playback and network access, saved automatic switching preferences, keyboard operation, deliberate returns to Twitch, and cancellation during pending lookups or network suspension. `npm test` runs both groups. GitHub Actions runs the same checks on pull requests and pushes to `main`.
 
-Es werden nur direkte Kanal-URLs im aktuell geladenen Profil ausgewertet. Bei fehlenden Links hilft der Info-/About-Bereich. Namenssuche, Link-Aggregatoren, Videolinks und eine dauernde Hintergrundabfrage sind nicht implementiert. Ein neuer Stream nach einer abgeschlossenen Suche wird über **Erneut prüfen** gesucht. Die Erkennung benötigt keine zusätzlichen Berechtigungen, kein Backend und keinen API-Schlüssel.
+These checks establish fixture behavior and real Chromium extension integration. They do not establish authenticated Twitch behavior, real subscription purchases/expirations, YouTube playback, Premium benefits, or behavior during actual Twitch ad breaks.
 
-## Zusammenfassung der bisherigen Entwicklung
+## Previous live observations
 
-Ziel ist eine Chromium-Erweiterung, die den YouTube-Livestream einer Person auf deren Twitch-Seite abspielt, während der native Twitch-Chat erhalten bleibt. Hintergrund ist die bevorzugte Nutzung einer vorhandenen YouTube-Premium-Anmeldung. Eine Werbefreiheitsgarantie gehört nicht zum Funktionsumfang.
+During the original 0.3.0 discovery work, Chromium screenshots were inspected at normal and small player sizes and in the popup. A public Twitch About section was checked for its DOM structure, and its headings and legacy YouTube URL informed the discovery implementation. A separate Node request verified the linked YouTube channel as offline.
 
-1. **0.1.0 – STYLERZ:** Feste Zuordnung zu `@STYLERZlive`, Erkennung eines bestätigten Livestreams, manueller Player-Wechsel und Rückkehr zu Twitch. Der reguläre YouTube-Player verwendet die Browser-Sitzung. Twitch-Videodaten werden im betroffenen Tab angehalten.
-2. **0.2.0 – ColtHavok:** Zweite feste Zuordnung zu `@ColtHavok`. Getrennte Suchergebnisse und Bereinigung beim Wechsel zwischen Kanälen sowie Unterstützung mehrerer Tabs.
-3. **0.2.1 – Playerfläche und Vorschau:** Ein Banner nahm dem Video in der damaligen Reproduktion rund 133 Pixel Höhe. Er wurde durch ein kleines ⋯-Menü über dem Video ersetzt. Twitchs Werbe-Minivorschau außerhalb des Hauptplayers belegte in der Testseite weitere 180 Pixel über dem Chat. Im YouTube-Modus wird ihr Container samt Platzbedarf ausgeblendet.
+A loaded-extension attempt on the real Twitch page found the profile link but could not reach YouTube from a fresh Chromium profile. **Real YouTube playback, Premium sign-in, and Twitch ad breaks were not confirmed by that attempt.** A successful Node metadata request does not replace browser validation.
 
-Im bisherigen Verlauf wurde vom Nutzer bestätigt, dass der grundlegende Austausch gegen den YouTube-Stream funktioniert. Die anschließenden Layoutkorrekturen wurden als Version 0.2.1 bereitgestellt.
+The automatic-switching and icon work also inspected popup and icon screenshots. Its browser checks used controlled fixtures and did not perform a new live Twitch/YouTube playback check.
 
-## Überlieferte Prüfung und ihre Grenzen
+Subscription work on October 26, 2026 separately confirmed `not-subscribed` for a live ColtHavok stream in a fresh signed-out Chromium profile. Offline STYLERZ lacked channel-specific player data and remained `unknown`. Authenticated subscription behavior still requires manual validation; details and source evidence are recorded in the subscription document.
 
-Der ursprüngliche Entwicklungsthread meldet für 0.2.1 **10 bestandene Resolver-Tests und 27 bestandene Browserchecks**, einschließlich simulierter Werbevorschauen. Frühere Checks umfassten Kanalwechsel, mehrere Tabs, Netzwerkregeln und die Übertragung eines YouTube-Sitzungscookies an den eingebetteten Player.
+## Development history
 
-Diese Ergebnisse stammen aus dem früheren Entwicklungsstand. Die zugehörigen Tests und Fixtures sind im bereitgestellten Release-Ordner nicht enthalten und wurden für diese Repository-Übernahme nicht erneut ausgeführt. Eine eigene Prüfung der tatsächlichen Premium-Anmeldung und verlässlichen Werbefreiheit im Nutzerprofil ist damit nicht belegt.
+1. **0.1.0 — STYLERZ:** A fixed `@STYLERZlive` mapping, verified livestream discovery, manual player replacement, and return to Twitch. The regular YouTube player uses the browser session; Twitch video requests are paused in the affected tab.
+2. **0.2.0 — ColtHavok:** A second `@ColtHavok` mapping, isolated results, cleanup during channel navigation, and multiple-tab support.
+3. **0.2.1 — Player area and ad preview:** A banner that consumed about 133 pixels in the original reproduction became a small overlay menu. The simulated ad preview occupied another 180 pixels above chat; YouTube mode now hides its container and releases that space.
+4. **0.3.0 — Profile discovery:** Direct profile links support additional creators, with metadata verification and a smaller interface.
 
-Bei der Repository-Übernahme wurden alle sieben Release-Dateien per SHA-256 mit der Vorlage verglichen: identisch. Die vier JavaScript-Dateien bestanden `node --check`; das Manifest wurde als JSON gelesen und seine Dateiverweise wurden geprüft. Diese statischen Prüfungen ersetzen keinen Live-Browsertest.
+The earlier development record reported 10 passing resolver tests and 27 passing browser checks for 0.2.1, including simulated ad previews, navigation, multiple tabs, network rules, and a YouTube session cookie reaching the embed. Those test sources were absent from the imported release and were not rerun during repository import. They are historical reports, not results from the current suites.
 
-## Noch offen
+At import, all seven release files matched the source archive by SHA-256; the four JavaScript files passed syntax checks, and manifest file references were validated. Those static checks did not establish Premium sign-in or reliable ad-free playback.
 
-- Version 0.2.1 unter echten Twitch-Werbepausen und mit dem verwendeten YouTube-Premium-Profil praktisch bestätigen.
-- Manuelle Zeitanpassung des YouTube-Streams und spätere Synchronisationshilfen untersuchen.
-- Automatische Zuordnung über weitere Quellen und eine Oberfläche für manuelle Zuordnungen untersuchen.
+## Remaining work
 
-Die aktuell implementierten Funktionen und die Installation beschreibt die [README](../README.md).
+- Validate playback during real Twitch ad breaks and with a signed-in YouTube Premium profile.
+- Validate subscription purchases and expirations with authenticated accounts.
+- Explore manual timing adjustments and synchronization assistance.
+- Explore additional discovery sources and a manual mapping interface.
+
+See the [README](../README.md) for an overview and the [installation guide](INSTALLATION.md) for setup and updates.

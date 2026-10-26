@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { JSDOM, VirtualConsole } from "jsdom";
 
-const config = readFileSync(new URL("../config.js", import.meta.url), "utf8");
-const discovery = readFileSync(new URL("../discovery.js", import.meta.url), "utf8");
-const source = readFileSync(new URL("../content.js", import.meta.url), "utf8");
+const config = readFileSync(new URL("../../extension/config.js", import.meta.url), "utf8");
+const discovery = readFileSync(new URL("../../extension/discovery.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../extension/content.js", import.meta.url), "utf8");
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise(setImmediate); };
 const deferred = () => { let resolve; const promise = new Promise((fn) => { resolve = fn; }); return { promise, resolve }; };
 

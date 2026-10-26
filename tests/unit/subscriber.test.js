@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { test } from "node:test";
 
-const source = readFileSync(new URL("../subscriber.js", import.meta.url), "utf8").replace("export ", "");
+const source = readFileSync(new URL("../../extension/subscriber.js", import.meta.url), "utf8").replace("export ", "");
 
 function detect({ data, extra = [], pathname = "/stylerz", origin = "https://www.twitch.tv", stale = false, missingPlayer = false, missingReact = false, detached = false } = {}) {
   const player = {};

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
-const scripts = await Promise.all(["config.js", "discovery.js", "content.js"].map((file) => readFile(new URL(`../${file}`, import.meta.url), "utf8")));
+const scripts = await Promise.all(["config.js", "discovery.js", "content.js"].map((file) => readFile(new URL(`../../extension/${file}`, import.meta.url), "utf8")));
 let browser;
 before(async () => { browser = await chromium.launch({ channel: "chromium", headless: true }); });
 after(async () => { await browser?.close(); });
