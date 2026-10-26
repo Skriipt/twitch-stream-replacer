@@ -1,8 +1,11 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { listing, player, pageJson, profileUrl, publicResponse, VIDEO } from "../fixtures.js";
+const STYLERZ = "UC6NBwF9A5P2ni8YRvVHgvsA";
+const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(setImmediate); };
 const originalFetch = globalThis.fetch;
-afterEach(() => { globalThis.fetch = originalFetch; delete globalThis.chrome; });
+const originalNow = Date.now;
+afterEach(() => { globalThis.fetch = originalFetch; Date.now = originalNow; delete globalThis.chrome; });
 
 async function worker() {
   const listeners = {};
@@ -112,4 +115,59 @@ test("automatic suspension requires opt-in and respects per-tab Twitch overrides
   assert.equal((await app.message({ ...automatic, automatic: false })).result.state, "suspended", "manual playback still works");
   app.listeners.removed(1);
   assert.equal(app.session["twitchOverride:1"], undefined);
+});
+
+test("opening a configured channel prewarms the lookup before the page asks", async () => {
+  const app = await worker();
+  app.tabs.set(3, { url: "https://www.twitch.tv/stylerz" });
+  let count = 0;
+  globalThis.fetch = async (url) => {
+    count += 1;
+    return publicResponse(url, url.includes("/watch?") ? pageJson("ytInitialPlayerResponse", player(STYLERZ)) : pageJson("ytInitialData", listing(STYLERZ)));
+  };
+  app.listeners.updated(3, { status: "loading" }, app.tabs.get(3));
+  await settle();
+  assert.equal(count, 2);
+  // Profile links found by the page must not miss the prewarmed result.
+  const reply = await app.message({ type: "LOOKUP", twitchLogin: "stylerz", youtubeLinks: ["https://www.youtube.com/@STYLERZlive/streams"] }, 3);
+  assert.equal(reply.result.state, "live");
+  assert.equal(count, 2);
+  app.listeners.updated(3, { url: "https://www.twitch.tv/directory" }, app.tabs.get(3));
+  await settle();
+  assert.equal(count, 2, "non-channel routes are never prewarmed");
+});
+
+test("profile links are remembered so the next visit prewarms an unconfigured channel", async () => {
+  const app = await worker();
+  let count = 0;
+  globalThis.fetch = async (url) => {
+    count += 1;
+    return publicResponse(url, url.includes("/watch?") ? pageJson("ytInitialPlayerResponse", player()) : pageJson("ytInitialData", listing()));
+  };
+  app.listeners.updated(1, { status: "loading" }, app.tabs.get(1));
+  await settle();
+  assert.equal(count, 0, "nothing is known about this channel yet");
+  await app.message({ type: "LOOKUP", twitchLogin: "creator", youtubeLinks: [profileUrl] });
+  assert.equal(count, 2);
+  await settle();
+  assert.deepEqual(app.local.knownProfileLinks, { creator: [profileUrl] });
+  const now = Date.now();
+  Date.now = () => now + 60_000;
+  app.listeners.updated(1, { url: "https://www.twitch.tv/creator" }, app.tabs.get(1));
+  await settle();
+  assert.equal(count, 4);
+});
+
+test("remembered profile links are capped", async () => {
+  const app = await worker();
+  globalThis.fetch = async (url) => publicResponse(url, url.includes("/watch?") ? pageJson("ytInitialPlayerResponse", player()) : pageJson("ytInitialData", listing()));
+  for (let i = 0; i < 30; i++) {
+    app.tabs.set(1, { url: `https://www.twitch.tv/creator${i}` });
+    await app.message({ type: "LOOKUP", twitchLogin: `creator${i}`, youtubeLinks: [profileUrl] });
+    await settle();
+  }
+  const logins = Object.keys(app.local.knownProfileLinks);
+  assert.equal(logins.length, 25);
+  assert.equal(logins.at(-1), "creator29");
+  assert.equal(logins.includes("creator0"), false);
 });

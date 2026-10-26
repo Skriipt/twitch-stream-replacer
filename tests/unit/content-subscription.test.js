@@ -9,7 +9,7 @@ const source = readFileSync(new URL("../../extension/content.js", import.meta.ur
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise(setImmediate); };
 const deferred = () => { let resolve; const promise = new Promise((fn) => { resolve = fn; }); return { promise, resolve }; };
 
-async function page(t, initial = "not-subscribed") {
+async function page(t, initial = "not-subscribed", intercepted, settings) {
   const errors = [];
   const console = new VirtualConsole();
   console.on("jsdomError", (error) => { errors.push(error); });
@@ -19,7 +19,7 @@ async function page(t, initial = "not-subscribed") {
   t.after(() => { dom.window.close(); });
   const { window } = dom;
   let state = initial;
-  let handler;
+  let handler = intercepted;
   let routeMessage;
   let paused = 0;
   const intervals = new Map();
@@ -29,6 +29,7 @@ async function page(t, initial = "not-subscribed") {
   window.clearInterval = (id) => { intervals.delete(id); };
   window.HTMLMediaElement.prototype.pause = () => { paused++; };
   window.chrome = {
+    storage: settings && { onChanged: { addListener() {} }, local: { get: async () => settings, set: async () => {} } },
     runtime: {
       id: "extension", onMessage: { addListener: (fn) => { routeMessage = fn; } },
       sendMessage: async (message) => {
@@ -36,7 +37,7 @@ async function page(t, initial = "not-subscribed") {
         const overridden = handler?.(message);
         if (overridden !== undefined) return overridden;
         if (message.type === "SUBSCRIPTION") return { ok: true, result: { state, twitchLogin: message.twitchLogin } };
-        if (message.type === "LOOKUP") return { ok: true, result: { state: "live", videoId: "abcdefghijk", title: "Live" } };
+        if (message.type === "LOOKUP") return { ok: true, result: { state: "live", videoId: "abcdefghijk", title: "Live", checkedAt: Date.now() } };
         if (message.type === "SUSPEND") return { ok: true, result: { state: "suspended" } };
         return { ok: true, result: {} };
       },
@@ -61,11 +62,12 @@ async function page(t, initial = "not-subscribed") {
   };
 }
 
-test("subscribers keep Twitch playback without YouTube lookup or network blocking", async (t) => {
+test("subscribers keep Twitch playback and never use the YouTube lookup or network blocking", async (t) => {
   const p = await page(t, "subscribed");
   assert.equal(p.shadow.getElementById("watch").disabled, true);
   assert.match(p.shadow.getElementById("subscription-status").textContent, /Aktives Kanal-Abo/);
-  assert.deepEqual(p.calls.map((call) => call.type), ["SUBSCRIPTION"]);
+  assert.equal(p.calls.some((call) => call.type === "SUSPEND"), false);
+  assert.doesNotMatch(p.shadow.getElementById("status").textContent, /Live auf YouTube/);
   assert.equal(p.paused, 0);
   assert.equal(p.window.document.querySelector("video").muted, false);
 });
@@ -83,7 +85,7 @@ test("non-subscribers retain the existing manual replacement", async (t) => {
 test("unknown/loading data blocks replacement and recovers when Twitch data arrives", async (t) => {
   const p = await page(t, "unknown");
   assert.equal(p.shadow.getElementById("watch").disabled, true);
-  assert.equal(p.calls.some((call) => call.type === "LOOKUP"), false);
+  assert.doesNotMatch(p.shadow.getElementById("status").textContent, /Live auf YouTube/);
   p.state = "not-subscribed";
   await p.poll();
   assert.equal(p.shadow.getElementById("watch").disabled, false);
@@ -133,7 +135,8 @@ test("channel navigation discards a delayed subscription answer", async (t) => {
   assert.match(p.shadow.getElementById("channel-name").textContent, /ColtHavok/);
   assert.equal(p.shadow.getElementById("watch").disabled, true);
   assert.match(p.shadow.getElementById("subscription-status").textContent, /Aktives Kanal-Abo/);
-  assert.equal(p.calls.filter((call) => call.type === "LOOKUP" && call.twitchLogin === "colthavok").length, 0);
+  assert.doesNotMatch(p.shadow.getElementById("status").textContent, /Live auf YouTube/);
+  assert.equal(p.calls.some((call) => call.type === "SUSPEND"), false);
   assert.equal(p.intervals.size, 1);
 });
 
@@ -200,4 +203,52 @@ test("a delayed automatic restore cannot reload a newly opened channel", async (
   await flush();
   assert.match(p.shadow.getElementById("channel-name").textContent, /ColtHavok/);
   assert.equal(p.errors.filter((error) => /navigation/.test(error.message)).length, 0);
+});
+
+test("the YouTube lookup starts while the subscription state is still loading", async (t) => {
+  const delayed = deferred();
+  const p = await page(t, "not-subscribed", (message) => message.type === "SUBSCRIPTION" ? delayed.promise : undefined);
+  assert.ok(p.calls.some((call) => call.type === "LOOKUP"));
+  assert.equal(p.shadow.getElementById("watch").disabled, true);
+  delayed.resolve({ ok: true, result: { state: "not-subscribed", twitchLogin: "stylerz" } });
+  await flush();
+  assert.equal(p.shadow.getElementById("watch").disabled, false);
+  assert.equal(p.calls.filter((call) => call.type === "LOOKUP").length, 1, "the pending lookup is reused");
+});
+
+test("an unknown subscription state is retried quickly until Twitch data arrives", async (t) => {
+  let reads = 0;
+  const p = await page(t, "unknown", (message) => {
+    if (message.type !== "SUBSCRIPTION") return undefined;
+    reads += 1;
+    return { ok: true, result: { state: reads > 3 ? "not-subscribed" : "unknown", twitchLogin: message.twitchLogin } };
+  });
+  assert.equal(reads, 5, "initial check, three unknown retries, then confirmation");
+  assert.equal(p.shadow.getElementById("watch").disabled, false);
+  assert.match(p.shadow.getElementById("status").textContent, /Live auf YouTube/);
+});
+
+test("fast subscription retries are bounded, so a permanently unknown state falls back to the slow poll", async (t) => {
+  const p = await page(t, "unknown");
+  const reads = p.calls.filter((call) => call.type === "SUBSCRIPTION").length;
+  assert.ok(reads > 3 && reads <= 32, `${reads} reads`);
+  assert.equal(p.shadow.getElementById("watch").disabled, true);
+  await p.poll();
+  assert.equal(p.calls.filter((call) => call.type === "SUBSCRIPTION").length, reads + 1);
+});
+
+test("an automatic switch reuses the lookup that just found the stream; a click verifies again", async (t) => {
+  const auto = await page(t, "not-subscribed", undefined, { autoSwitchToYouTube: true, panelCollapsed: false });
+  assert.ok(auto.shadow.getElementById("youtube"));
+  assert.deepEqual(auto.calls.filter((call) => call.type === "LOOKUP").map((call) => call.force), [false, false]);
+  const manual = await page(t);
+  await manual.click("watch");
+  assert.ok(manual.shadow.getElementById("youtube"));
+  assert.equal(manual.calls.filter((call) => call.type === "LOOKUP").at(-1).force, true);
+});
+
+test("Erneut prüfen still forces a fresh lookup", async (t) => {
+  const p = await page(t);
+  await p.click("check");
+  assert.equal(p.calls.filter((call) => call.type === "LOOKUP").at(-1).force, true);
 });

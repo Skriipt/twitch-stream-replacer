@@ -50,17 +50,49 @@ async function lookup(channel, force = false, links = []) {
   const urls = [...new Set((Array.isArray(links) ? links : []).filter((url) => typeof url === "string")
     .map(CONFIG.youtubeChannelUrl).filter(Boolean))].sort();
   if (urls.length > 5) throw new Error("Zu viele YouTube-Kanäle verlinkt. Bitte direkt auf YouTube auswählen.");
-  const key = JSON.stringify([channel.twitchLogin, urls]);
+  // Configured channels ignore profile links, so they must not split the cache.
+  const key = JSON.stringify([channel.twitchLogin, channel.channelId ? [] : urls]);
   const previous = cached.get(key);
   if (!force && previous && Date.now() - previous.checkedAt < 30_000) return previous;
   if (!pending.has(key)) {
     pending.set(key, discoverLiveStream(channel, urls).then((result) => {
       const value = { ...result, twitchLogin: channel.twitchLogin, checkedAt: Date.now() };
       cached.set(key, value);
+      if (!channel.channelId) void rememberLinks(channel.twitchLogin, urls);
       return value;
     }).finally(() => { pending.delete(key); }));
   }
   return pending.get(key);
+}
+
+// Profile links are only readable once Twitch has rendered the page. Remember
+// them per channel so a later visit can start the YouTube lookup immediately.
+const KNOWN_LINKS_KEY = "knownProfileLinks";
+const KNOWN_LINKS_LIMIT = 25;
+async function knownLinks() {
+  try { return (await chrome.storage.local.get({ [KNOWN_LINKS_KEY]: {} }))[KNOWN_LINKS_KEY] || {}; } catch { return {}; }
+}
+async function rememberLinks(login, urls) {
+  if (urls.length === 0) return;
+  try {
+    const known = await knownLinks();
+    if (JSON.stringify(known[login]) === JSON.stringify(urls)) return;
+    delete known[login];
+    const entries = Object.entries({ ...known, [login]: urls }).slice(-KNOWN_LINKS_LIMIT);
+    await chrome.storage.local.set({ [KNOWN_LINKS_KEY]: Object.fromEntries(entries) });
+  } catch {
+    // Remembering links only speeds up later visits.
+  }
+}
+
+// Fill the lookup cache while Twitch is still loading, before the content
+// script and player exist. The page's own LOOKUP then finds it ready.
+async function prewarm(url) {
+  const channel = CONFIG.channelForUrl(url);
+  if (!channel) return;
+  const urls = channel.channelId ? [] : (await knownLinks())[channel.twitchLogin];
+  if (!Array.isArray(urls) || (!channel.channelId && urls.length === 0)) return;
+  await lookup(channel, false, urls);
 }
 
 // All tabs share the rule ID space. Serialize updates globally so simultaneous
@@ -141,10 +173,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 
-chrome.tabs.onUpdated.addListener((tabId, change) => {
+chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
   if (change.url?.startsWith("https://www.twitch.tv/")) {
     void chrome.tabs.sendMessage(tabId, { type: "ROUTE_CHANGED" }, { frameId: 0 }).catch(() => {});
   }
+  const url = change.url ?? (change.status === "loading" ? tab?.url : undefined);
+  if (url?.startsWith("https://www.twitch.tv/")) void prewarm(url).catch(() => {});
   // Clear on any real navigation/reload, including a reload of /stylerz itself.
   if (change.status === "loading" || (change.url && !isChannel(change.url))) {
     void setSuspended(tabId, false).catch(() => {});

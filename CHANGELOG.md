@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Switch to YouTube sooner: retry an unconfirmed subscription state every 0.4 seconds for up to 12 seconds instead of waiting for the five-second poll, start the YouTube lookup while the subscription state loads, and let an automatic switch reuse the lookup that just found the stream.
+- Start the YouTube lookup as soon as a Twitch channel tab starts loading. Configured channels and channels whose profile links were seen before (the last 25 are remembered locally) are looked up before the page finishes rendering. This includes viewers who turn out to be subscribed; Twitch keeps playing for them.
 - Remember the collapsed panel across reloads, channels and Twitch tabs.
 - Show the volume level briefly while changing it with the mouse wheel.
 - Reveal the player menu button only while the pointer moves over the video, like YouTube's own controls.

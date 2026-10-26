@@ -604,21 +604,41 @@ test("automatic playback leaves ambiguous, offline and failed lookups on Twitch"
   await popup.close();
 });
 
-test("disabling automatic playback during initial lookup or revalidation never suspends Twitch", async () => {
+test("automatic playback follows Twitch's subscription data within a second instead of waiting for the slow poll", async () => {
+  await mockYouTube(routes());
   const popup = await openPopup();
-  for (const phase of ["initial", "revalidation"]) {
+  await setAutomatic(popup, true);
+  const page = await open("autoquick");
+  await page.evaluate(() => window.setSubscription("unknown"));
+  await addLinks(page);
+  await expect(page.locator(`${root} #status`)).toContainText("Abo-Status konnte noch nicht bestätigt");
+  // Land just after a 5s tick would have fired, so only the fast retry can react in time.
+  await page.waitForTimeout(1_000);
+  await page.evaluate(() => window.setSubscription("not-subscribed"));
+  const started = Date.now();
+  await expect(page.locator(`${root} iframe`)).toBeVisible({ timeout: 2_000 });
+  assert.ok(Date.now() - started < 2_000);
+  await setAutomatic(popup, false);
+  await close(page);
+  await popup.close();
+});
+
+test("disabling automatic playback during the initial lookup never suspends Twitch", async () => {
+  const popup = await openPopup();
+  // An automatic switch reuses that lookup, so there is no second lookup to hold.
+  for (const phase of ["initial"]) {
     await mockYouTube(routes());
-    await worker.evaluate((phase) => {
+    await worker.evaluate(() => {
       const fetchFixture = globalThis.fetch;
       let calls = 0;
       globalThis.fetch = async (...args) => {
         calls += 1;
-        if (calls === (phase === "initial" ? 1 : 3)) {
+        if (calls === 1) {
           await new Promise((resolve) => { globalThis.releaseAutoLookup = resolve; });
         }
         return fetchFixture(...args);
       };
-    }, phase);
+    });
     await setAutomatic(popup, true);
     const page = await open(`autocancel${phase}`);
     await addLinks(page);
@@ -670,14 +690,13 @@ test("automatic playback preserves the subscription guard and recovers once a no
   await expect(page.locator(`${root} #status`)).toContainText("Twitch läuft mit deinem Kanal-Abo weiter");
   await expect(page.locator(`${root} #watch`)).toBeDisabled();
   await expect(page.locator(`${root} iframe`)).toHaveCount(0);
-  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
+  assert.equal((await sessionRules()).length, 0);
   await page.evaluate(() => window.setSubscription("unknown"));
   await page.locator(`${root} #check`).click();
   await expect(page.locator(`${root} #status`)).toContainText("Abo-Status konnte noch nicht bestätigt");
   await expect(page.locator(`${root} #watch`)).toBeDisabled();
   await expect(page.locator(`${root} iframe`)).toHaveCount(0);
   assert.equal((await sessionRules()).length, 0);
-  assert.equal((await worker.evaluate(() => testRequests)).length, 0);
   await page.evaluate(() => window.setSubscription("not-subscribed"));
   await page.locator(`${root} #check`).click();
   await expect(page.locator(`${root} iframe`)).toBeVisible();
