@@ -21,7 +21,11 @@ The toolbar popup provides **Automatisch zu YouTube** (Automatically switch to Y
 
 The bridge and play-symbol icon replaces the original placeholder. Its editable SVG source and packaged PNGs at 16, 32, 48, and 128 pixels live in `extension/assets/`. Run `npm run icons` to regenerate the PNGs using Chromium.
 
-Automatic switching keeps Twitch playing for active or unknown subscription states. It introduces no additional YouTube polling; the existing subscription checks remain in place.
+Automatic switching keeps Twitch playing for active or unknown subscription states. It introduces no periodic YouTube polling; the existing subscription checks remain in place.
+
+## Switching speed
+
+The service worker starts the YouTube lookup when a Twitch channel tab starts loading, for the two configured channels and for channels whose profile links an earlier lookup saw. The last 25 channels' links are stored in `chrome.storage.local` (`knownProfileLinks`). The page also starts its lookup while the subscription state is loading, and the result is cached for 30 seconds. Because the subscription is unknown at that point, subscribers to a channel also trigger one lookup per visit; they are never switched. An unconfirmed subscription state is retried every 0.4 seconds, up to 30 times. An automatic switch reuses a lookup younger than 10 seconds, while a manual click or an older result is verified again before Twitch is suspended.
 
 ## Reproducible repository checks
 

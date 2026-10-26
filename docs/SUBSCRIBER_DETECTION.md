@@ -8,7 +8,7 @@ The service worker handles `SUBSCRIPTION` messages from the extension's top-leve
 
 | State | Evidence | Replacement policy |
 | --- | --- | --- |
-| `subscribed` | Matching channel, identified viewer, and a nonempty `self.subscriptionBenefit.id`. | Keep Twitch; skip the YouTube lookup. |
+| `subscribed` | Matching channel, identified viewer, and a nonempty `self.subscriptionBenefit.id`. | Keep Twitch; never switch or block. The YouTube lookup may already have run, because it starts in parallel with the subscription check and when the tab starts loading. |
 | `not-subscribed` | Matching channel with an explicit null benefit for the identified viewer, or loaded signed-out `currentUser: null` data without a benefit. | Allow manual or opted-in automatic switching after checking for a live YouTube stream. |
 | `unknown` | Missing/loading/error data, conflicting viewer or benefit states, unavailable React internals, navigation, or failed script execution. | Block new replacement attempts and retry the subscription check. |
 
@@ -20,7 +20,7 @@ Prime, gifted, paid, and nonrenewing subscriptions use the same active benefit. 
 
 No OAuth setup, token/cookie reads, additional Twitch API requests, fetch interception, or page event bridge is involved. The additional `scripting` permission uses the existing `www.twitch.tv` host permission. The official [Check User Subscription API](https://dev.twitch.tv/docs/api/reference#check-user-subscription) would require a separate user authorization with `user:read:subscriptions`; this implementation uses the player's existing session data instead.
 
-The content script checks on entry, on manual retry, before switching, every five seconds in a visible supported tab, and immediately after the tab becomes visible. The service worker repeats the check inside the serialized `SUSPEND` operation before adding any network rule. A late response from a previous channel is discarded. Navigation removes the polling timer and resets subscription state; different tabs do not share viewer results.
+The content script checks on entry, on manual retry, before switching, every five seconds in a visible supported tab, and immediately after the tab becomes visible. While the state is `unknown`, a visible tab retries every 0.4 seconds, up to 30 times, so Twitch's late-loading viewer data is picked up without waiting for the five-second poll. The service worker repeats the check inside the serialized `SUSPEND` operation before adding any network rule. A late response from a previous channel is discarded. Navigation removes the polling timer and resets subscription state; different tabs do not share viewer results.
 
 A subscription detected during YouTube playback releases the tab's blocking rule and reloads Twitch using the existing return-to-Twitch path. Unknown results during an already active replacement block new switches; they do not repeatedly interrupt playback. Hidden tabs skip polling and recheck on becoming visible.
 

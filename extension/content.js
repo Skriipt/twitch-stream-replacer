@@ -5,6 +5,11 @@
   const ACTIVE_ATTRIBUTE = "data-stream-bridge-active";
   const PREVIEW_SELECTOR = ".picture-by-picture-player";
   const RELOAD_MESSAGE = "Erweiterung bitte neu laden und Twitch aktualisieren.";
+  // Twitch fills in the viewer's subscription data a moment after the player
+  // mounts. Retry quickly while it is unknown instead of waiting for the slow poll.
+  const SUBSCRIPTION_RETRY_MS = 400;
+  const SUBSCRIPTION_RETRY_LIMIT = 30;
+  const RECENT_LOOKUP_MS = 10_000;
   if (window.top !== window || document.getElementById(ROOT_ID)) return;
 
   let root = null;
@@ -30,6 +35,8 @@
   let subscription = { state: "unknown" };
   let subscriptionPending = null;
   let subscriptionTimer = null;
+  let subscriptionRetries = 0;
+  let subscriptionRetryTimer = 0;
   const mutedVideos = new Map();
 
   function isChannel() {
@@ -132,12 +139,24 @@
     return request;
   }
 
+  function retrySubscription() {
+    if (active || subscriptionRetryTimer || subscriptionRetries >= SUBSCRIPTION_RETRY_LIMIT) return;
+    subscriptionRetries += 1;
+    const token = generation;
+    subscriptionRetryTimer = setTimeout(() => {
+      subscriptionRetryTimer = 0;
+      if (token === generation) void pollSubscription();
+    }, SUBSCRIPTION_RETRY_MS);
+  }
+
   async function pollSubscription() {
     if (!root || document.hidden) return;
     const token = generation;
     const previous = subscription.state;
     const result = await refreshSubscription();
     if (token !== generation) return;
+    if (result.state === "unknown") retrySubscription();
+    else subscriptionRetries = 0;
     if (result.state === "subscribed" && active && !switching) { void back(false); return; }
     if (result.state === "subscribed") stream = null;
     if (result.state === "not-subscribed" && previous !== result.state && !stream) void check(false);
@@ -184,6 +203,9 @@
     subscriptionPending = null;
     clearInterval(subscriptionTimer);
     subscriptionTimer = null;
+    clearTimeout(subscriptionRetryTimer);
+    subscriptionRetryTimer = 0;
+    subscriptionRetries = 0;
     root?.remove();
     root = null;
     shadow = null;
@@ -229,14 +251,20 @@
     if (channel.youtubeStreams) direct.href = channel.youtubeStreams;
     status(`Suche den aktuellen ${channel.displayName}-Livestream …`);
     syncButtons();
+    // Start the YouTube lookup while the subscription state is still loading;
+    // the background worker caches it, so a retry reuses the result. Known
+    // subscribers skip it. The result is only used once not-subscribed is confirmed.
+    const lookup = subscription.state === "subscribed" ? null : send("LOOKUP", { force, youtubeLinks: links });
+    lookup?.catch(() => {});
     try {
       const viewer = await refreshSubscription();
       if (token !== generation || !isChannel()) return;
       if (viewer.state !== "not-subscribed") {
         status(viewer.error || (viewer.state === "subscribed" ? "Twitch läuft mit deinem Kanal-Abo weiter." : "Der Abo-Status konnte noch nicht bestätigt werden. Bitte erneut prüfen."));
+        if (viewer.state === "unknown") retrySubscription();
         return;
       }
-      const result = await send("LOOKUP", { force, youtubeLinks: links });
+      const result = await (lookup ?? send("LOOKUP", { force, youtubeLinks: links }));
       if (token !== generation || !isChannel()) return;
       if (checkedLinks !== JSON.stringify(youtubeLinks())) return;
       showResult(result);
@@ -268,8 +296,11 @@
       }
       // The channel tab may have stayed open since a previous broadcast.
       // Recheck before suspending Twitch so an old result cannot open a VOD.
+      // Only an automatic switch right after the lookup that found the stream
+      // reuses that result; a click or an older result is verified again.
       const links = youtubeLinks();
-      const selected = await send("LOOKUP", { force: true, youtubeLinks: links });
+      const recent = automatic && stream.checkedAt > Date.now() - RECENT_LOOKUP_MS && JSON.stringify(links) === checkedLinks;
+      const selected = await send("LOOKUP", { force: !recent, youtubeLinks: links });
       if (token !== generation || !isChannel()) return;
       if (JSON.stringify(links) !== JSON.stringify(youtubeLinks())) {
         stream = null;
