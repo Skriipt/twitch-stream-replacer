@@ -142,8 +142,21 @@ test("loaded extension discovers late profile links, switches video and preserve
   const frameBox = await page.locator(`${root} iframe`).boundingBox();
   assert.equal(frameBox.width, 960);
   assert.equal(frameBox.height, 540);
+  await page.getByRole("textbox", { name: "Chat" }).hover();
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "0");
+  await page.locator(`${root} iframe`).hover();
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "0.45");
+  // Like YouTube's controls, the button fades after the pointer rests.
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "0", { timeout: 5_000 });
+  await page.locator(`${root} iframe`).hover({ position: { x: 300, y: 200 } });
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "0.45");
+  await page.getByRole("textbox", { name: "Chat" }).hover();
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "0", { timeout: 1_000 });
   await page.locator(`${root} #menu`).click();
   await expect(page.locator(`${root} #back`)).toBeVisible();
+  await expect(page.locator(`${root} #subscription-status`)).toBeHidden();
+  await page.getByRole("textbox", { name: "Chat" }).hover();
+  await expect(page.locator(`${root} #menu`)).toHaveCSS("opacity", "1");
   await page.locator(`${root} #close-menu`).press("Escape");
   await expect(page.locator(`${root} #back`)).toBeHidden();
   await expect(page.locator(`${root} #menu`)).toBeFocused();
@@ -163,6 +176,30 @@ test("loaded extension discovers late profile links, switches video and preserve
   assert.equal((await sessionRules()).length, 0);
   await expect(page.locator(".picture-by-picture-player")).toBeVisible();
   await close(page);
+});
+
+test("collapsed panel is remembered across reloads, channels and tabs", async () => {
+  await mockYouTube(routes());
+  const first = await open("collapsefirst");
+  try {
+    await first.locator(`${root} #collapse`).click();
+    await expect(first.locator(`${root} #status`)).toBeHidden();
+    await first.reload();
+    await expect(first.locator(`${root} #collapse`)).toHaveAttribute("aria-expanded", "false");
+    await expect(first.locator(`${root} #status`)).toBeHidden();
+    const second = await open("collapsesecond");
+    await expect(second.locator(`${root} #status`)).toBeHidden();
+    await expect(second.locator(`${root} #collapse`)).toHaveAccessibleName("Stream Bridge ausklappen");
+    if (process.env.STREAM_BRIDGE_ARTIFACTS) await second.screenshot({ path: `${process.env.STREAM_BRIDGE_ARTIFACTS}/collapsed-panel.png` });
+    await second.locator(`${root} #collapse`).click();
+    await expect(second.locator(`${root} #status`)).toBeVisible();
+    await expect(first.locator(`${root} #status`)).toBeVisible();
+    await expect(first.locator(`${root} #collapse`)).toHaveAttribute("aria-expanded", "true");
+    await close(second);
+  } finally {
+    await worker.evaluate(() => chrome.storage.local.remove("panelCollapsed"));
+    await close(first);
+  }
 });
 
 test("bridge menu leaves native YouTube corner controls clickable at normal and small sizes", async () => {
@@ -207,12 +244,18 @@ test("wheel over the cross-origin YouTube player changes volume by 1%, clamps an
     await video.hover();
     await page.mouse.wheel(0, -120);
     await expect(video).toHaveJSProperty("volume", 0.51);
+    const hud = page.frameLocator(`${root} iframe`).locator("#stream-bridge-volume");
+    await expect(hud).toHaveText("51 %");
+    await expect(hud).toHaveCSS("opacity", "1");
+    if (process.env.STREAM_BRIDGE_ARTIFACTS) await page.screenshot({ path: `${process.env.STREAM_BRIDGE_ARTIFACTS}/volume-hud.png` });
+    await expect(hud).toHaveCSS("opacity", "0");
     await page.mouse.wheel(0, 120);
     await expect(video).toHaveJSProperty("volume", 0.5);
     await video.evaluate(() => { document.getElementById("movie_player").setVolume(1); });
     await page.mouse.wheel(0, 120);
     await expect(video).toHaveJSProperty("volume", 0);
     await expect(video).toHaveJSProperty("muted", true);
+    await expect(hud).toHaveText("Stumm");
     await page.mouse.wheel(0, 120);
     await expect(video).toHaveJSProperty("volume", 0);
     await page.mouse.wheel(0, -120);

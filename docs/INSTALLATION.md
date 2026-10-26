@@ -21,15 +21,15 @@ The subscription guard also applies to automatic switching: an active or unknown
 
 ## Player controls
 
-During YouTube playback, a small **⋯ button halfway down the right edge** opens **Zurück zu Twitch** (Return to Twitch), **Auf YouTube öffnen** (Open on YouTube), and **YouTube-Konto & Premium** (YouTube account and Premium). This keeps the button clear of YouTube's corner controls. The menu overlays the video without reducing its size. Close it with **×**, **Escape**, or a click in the chat.
+During YouTube playback, a small **⋯ button halfway down the right edge** opens **Zurück zu Twitch** (Return to Twitch), **Auf YouTube öffnen** (Open on YouTube), and **YouTube-Konto & Premium** (YouTube account and Premium). This keeps the button clear of YouTube's corner controls. The menu overlays the video without reducing its size. Close it with **×**, **Escape**, or a click in the chat. Like YouTube's own controls, the ⋯ button appears while the pointer moves over the video and fades out after about 2.5 seconds without movement or when the pointer leaves the player; keyboard focus also reveals it. The menu omits the subscription status line during YouTube playback.
 
-Hover over the YouTube player and scroll up to raise the volume or down to lower it in **1-percentage-point steps**. Volume stops at 100%; reaching 0% mutes playback, and scrolling up unmutes at 1%. The next step starts from the current volume, including changes made with YouTube's controls. Scrolling over Twitch chat or the Stream Bridge menu keeps its normal behavior. Ctrl/Command-scroll remains available for browser zoom. This control applies only to the embedded player opened by Stream Bridge.
+Hover over the YouTube player and scroll up to raise the volume or down to lower it in **1-percentage-point steps**. Volume stops at 100%; reaching 0% mutes playback, and scrolling up unmutes at 1%. The next step starts from the current volume, including changes made with YouTube's controls. Scrolling over Twitch chat or the Stream Bridge menu keeps its normal behavior. Ctrl/Command-scroll remains available for browser zoom. This control applies only to the embedded player opened by Stream Bridge. A short indicator at the top of the player shows the new level, or **Stumm** (Muted) at 0%.
 
 Wheel changes use the YouTube player's own volume and mute methods so its slider, mute indicator, and playback state stay synchronized. Volume control becomes available once those methods are ready.
 
 Twitch's small ad preview above chat is hidden during YouTube playback and its space is released. Leaving YouTube mode restores Twitch's own layout.
 
-If no public YouTube livestream is available, Twitch keeps playing. **Erneut prüfen** (Check again) starts another lookup; there is no periodic YouTube discovery polling. The panel's arrow collapses it to a small channel indicator. STYLERZ and ColtHavok also retain their configured fallback mappings.
+If no public YouTube livestream is available, Twitch keeps playing. **Erneut prüfen** (Check again) starts another lookup; there is no periodic YouTube discovery polling. The panel's arrow collapses it to a small channel indicator. The browser profile remembers this choice for all Twitch tabs, reloads, and channels until the panel is expanded again. STYLERZ and ColtHavok also retain their configured fallback mappings.
 
 **Auf YouTube öffnen** opens the stream directly on YouTube. During YouTube mode, this removes the embedded player to prevent duplicate playback. Twitch video stays paused while chat remains available in the Twitch tab.
 
@@ -60,6 +60,6 @@ YouTube describes embedded-player sign-in requirements in its [official help art
 - The extension is not an ad blocker; sponsorships within a stream remain visible.
 - There is no extension backend, telemetry, or credential storage.
 
-The extension uses Twitch access to insert controls, YouTube access to discover streams, and `*.ttvnw.net` access with temporary Chromium network rules to pause Twitch video requests in the relevant tab. The `scripting` permission reads subscription status from the current Twitch player's loaded data. The `storage` permission saves the automatic playback preference locally and remembers a tab's deliberate return to Twitch for the browser session. The browser may attach its existing YouTube session to channel requests; only channel and stream metadata is processed. There is no cookie permission or password/token extraction.
+The extension uses Twitch access to insert controls, YouTube access to discover streams, and `*.ttvnw.net` access with temporary Chromium network rules to pause Twitch video requests in the relevant tab. The `scripting` permission reads subscription status from the current Twitch player's loaded data. The `storage` permission saves the automatic playback preference and the collapsed panel state locally and remembers a tab's deliberate return to Twitch for the browser session. The browser may attach its existing YouTube session to channel requests; only channel and stream metadata is processed. There is no cookie permission or password/token extraction.
 
 An independent project with no affiliation with Twitch, YouTube, or the respective streamers.
