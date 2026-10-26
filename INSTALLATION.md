@@ -1,19 +1,19 @@
-# Stream Bridge · Prototyp 0.2.1
+# Stream Bridge · Prototyp 0.3.0
 
 1. ZIP vollständig entpacken.
 2. `chrome://extensions` öffnen (Edge: `edge://extensions`, Brave: `brave://extensions`).
 3. **Entwicklermodus** einschalten, **Entpackte Erweiterung laden** wählen und den Ordner auswählen, in dem `manifest.json` liegt.
 4. Im selben Browserprofil `https://www.youtube.com/` öffnen und das Konto mit **YouTube Premium** auswählen. Eine eventuelle YouTube-Cookie-Abfrage selbst abschließen.
-5. `https://www.twitch.tv/stylerz` oder `https://www.twitch.tv/colthavok` öffnen oder neu laden. Im Videobereich erscheint der kanalbezogene **Stream Bridge**-Umschalter.
+5. Eine Twitch-Kanalseite öffnen oder neu laden. Im Videobereich erscheint der kanalbezogene **Stream Bridge**-Umschalter. Das Add-on sucht im geladenen Profil und in den Infopanels nach verlinkten YouTube-Kanälen. Falls keine Links gefunden werden, den **Info-/About-Bereich** des Kanals öffnen; nachgeladene Links werden automatisch geprüft.
 6. Wenn der ausgewählte Streamer auf YouTube live ist, **YouTube ansehen** klicken. Falls nötig anschließend im Player auf Play klicken. Der Twitch-Chat bleibt auf der Seite. YouTube nutzt die gesamte ursprüngliche Playerfläche.
 
 Während der YouTube-Wiedergabe ersetzt ein kleiner **⋯-Knopf oben rechts** den bisherigen Banner. Darüber sind **Zurück zu Twitch**, **Auf YouTube öffnen** und **YouTube-Konto & Premium** erreichbar. Das Menü liegt über dem Video und verkleinert es nicht. Mit **×**, **Escape** oder einem Klick in den Chat lässt es sich schließen.
 
 Twitchs kleine Vorschau über dem Chat, die bei Werbepausen erscheinen kann, wird im YouTube-Modus ausgeblendet und ihr Platz freigegeben. Beim Verlassen des YouTube-Modus gilt wieder Twitchs eigener Zustand.
 
-Wenn kein öffentlicher YouTube-Livestream läuft, bleibt Twitch aktiv. **Erneut prüfen** sucht erneut. STYLERZ und ColtHavok sind fest eingerichtet.
+Wenn kein öffentlicher YouTube-Livestream läuft, bleibt Twitch aktiv. **Erneut prüfen** sucht erneut; eine regelmäßige Hintergrundabfrage findet nicht statt. Der Pfeil im Panel klappt es zu einem kleinen Kanalhinweis ein. STYLERZ und ColtHavok bleiben zusätzlich fest eingerichtet.
 
-## Update von 0.1.0 / 0.2.0
+## Update von einer älteren Version
 
 Die Dateien im bisher geladenen Erweiterungsordner durch die neuen Dateien ersetzen und unter `chrome://extensions` die Erweiterung **neu laden ↻**. Alternativ die alte Version deaktivieren und den neuen entpackten Ordner laden. **Nicht beide Versionen gleichzeitig aktiv lassen.** Anschließend die Twitch-Seite neu laden.
 
@@ -31,8 +31,10 @@ YouTube beschreibt diese Voraussetzung in seiner offiziellen Hilfe: https://supp
 
 ## Umfang
 
-- `twitch.tv/stylerz` → `@STYLERZlive` und `twitch.tv/colthavok` → `@ColtHavok`.
-- Suchergebnisse und Player werden zwischen beiden Streamern getrennt; ein Kanalwechsel beendet den vorherigen Player.
+- Automatische Zuordnung über YouTube-Kanallinks im geladenen Twitch-Profil: `@Handle`, `/channel/UC…`, `/c/Name`, `/user/Name` und ältere direkte Kanalnamen. Keine Namenssuche, Link-Aggregatoren oder einzelnen Videolinks. Chatlinks und Empfehlungen zählen nicht als Kanalzuordnung.
+- Bis zu fünf verschiedene Kanal-URLs werden geprüft. Sind mehrere Kanäle live oder ist eine Prüfung nicht möglich, erfolgt keine automatische Auswahl. Twitch spielt weiter.
+- Die bisherigen festen Zuordnungen für STYLERZ und ColtHavok bleiben erhalten.
+- Suchergebnisse und Player werden zwischen Streamern getrennt; ein Kanalwechsel beendet den vorherigen Player.
 - Twitch-Videodaten werden im umgeschalteten Tab angehalten. Andere Tabs bleiben verfügbar.
 - Zurückwechseln, Neuladen und Kanalwechsel entfernen die Videosperre.
 - Der Player bietet seine normalen YouTube-Funktionen. Im Player-Vollbild ist der Twitch-Chat nicht sichtbar.

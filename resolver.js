@@ -88,7 +88,7 @@ async function fetchPublicPage(url) {
       // The browser attaches its existing YouTube consent/login session. The
       // extension never reads cookie values or extracts account information.
       credentials: "include",
-      redirect: "manual",
+      redirect: "follow",
       signal: AbortSignal.timeout(15000),
       headers: { "Accept-Language": "en-US,en;q=0.9" },
     });
@@ -108,16 +108,43 @@ async function fetchPublicPage(url) {
 }
 
 export async function resolveLiveStream(channel = CONFIG.channels[0]) {
-  // /live normally redirects to a watch page, but redirects to a consent host
-  // would need unrelated host access. /streams has a stable channel identity.
+  // Legacy /c and /user URLs can redirect to a handle on the same YouTube host.
+  // The final host and channel metadata are checked before trusting the result.
   const html = await fetchPublicPage(channel.youtubeStreams);
   const data = extractJson(html, "ytInitialData");
   if (!data) throw new Error("Die YouTube-Seite konnte nicht gelesen werden. Bitte später erneut prüfen.");
-  const candidates = findLiveCandidates(data, channel);
+  const metadata = data.metadata?.channelMetadataRenderer;
+  if (!/^UC[A-Za-z0-9_-]{22}$/.test(metadata?.externalId || "") ||
+      (channel.channelId && channel.channelId !== metadata.externalId)) {
+    throw new Error("Der YouTube-Kanal konnte nicht sicher bestätigt werden.");
+  }
+  const confirmed = { ...channel, channelId: metadata.externalId };
+  const youtubeStreams = `https://www.youtube.com/channel/${confirmed.channelId}/streams`;
+  const candidates = findLiveCandidates(data, confirmed);
   if (candidates.length > 1) throw new Error(`Mehrere ${channel.displayName}-Livestreams gefunden. Bitte direkt auf YouTube auswählen.`);
-  if (candidates.length === 0) return { state: "offline" };
+  if (candidates.length === 0) return { state: "offline", youtubeStreams, channelId: confirmed.channelId };
   const candidate = extractJson(await fetchPublicPage(`https://www.youtube.com/watch?v=${candidates[0]}`), "ytInitialPlayerResponse");
   if (!candidate) throw new Error("Der Livestream konnte nicht bestätigt werden. Bitte direkt auf YouTube prüfen.");
-  const stream = validateLivePlayer(candidate, channel);
-  return stream ? { state: "live", ...stream } : { state: "offline" };
+  if (candidate.videoDetails?.videoId !== candidates[0]) throw new Error("YouTube hat einen anderen Stream geliefert. Bitte erneut prüfen.");
+  const stream = validateLivePlayer(candidate, confirmed);
+  return stream ? { state: "live", ...stream, youtubeStreams } : { state: "offline", youtubeStreams, channelId: confirmed.channelId };
+}
+
+export async function discoverLiveStream(channel, links = []) {
+  if (channel.channelId) return { ...await resolveLiveStream(channel), source: "configured" };
+  const urls = [...new Set(links.map(CONFIG.youtubeChannelUrl).filter(Boolean))];
+  if (urls.length === 0) return { state: "unlinked" };
+  if (urls.length > 5) throw new Error("Zu viele YouTube-Kanäle verlinkt. Bitte direkt auf YouTube auswählen.");
+  const live = new Map();
+  const confirmed = new Map();
+  // Do not silently pick a result if another linked channel cannot be checked.
+  for (const youtubeStreams of urls) {
+    const result = await resolveLiveStream({ ...channel, youtubeStreams });
+    confirmed.set(result.channelId, result);
+    if (result.state === "live") live.set(result.channelId, result);
+  }
+  if (live.size > 1) return { state: "ambiguous" };
+  if (live.size === 1) return { ...live.values().next().value, source: "profile" };
+  const result = confirmed.size === 1 ? confirmed.values().next().value : { state: "offline" };
+  return { ...result, source: "profile" };
 }
