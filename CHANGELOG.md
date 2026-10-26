@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Remember the collapsed panel across reloads, channels and Twitch tabs.
+- Show the volume level briefly while changing it with the mouse wheel.
+- Reveal the player menu button only while the pointer moves over the video, like YouTube's own controls.
+- Omit the subscription status line from the menu during YouTube playback.
+
 ## 0.3.0
 
 ### Added

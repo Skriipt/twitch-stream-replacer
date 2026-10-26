@@ -24,6 +24,9 @@
   let pageStyle = null;
   let autoSwitch = false;
   let settingsRevision = 0;
+  let collapsed = false;
+  let collapseRevision = 0;
+  let pointerTimer = 0;
   let subscription = { state: "unknown" };
   let subscriptionPending = null;
   let subscriptionTimer = null;
@@ -70,6 +73,15 @@
       trigger.setAttribute("aria-label", open ? "Stream-Bridge-Menü schließen" : "Stream-Bridge-Menü öffnen");
       if (focusTrigger) trigger.focus();
     }
+  }
+
+  function applyCollapsed() {
+    root?.toggleAttribute("data-collapsed", collapsed);
+    const button = shadow?.getElementById("collapse");
+    if (!button) return;
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.setAttribute("aria-label", collapsed ? "Stream Bridge ausklappen" : "Stream Bridge einklappen");
+    button.title = collapsed ? "Ausklappen" : "Einklappen";
   }
 
   function setActiveLayout(enabled) {
@@ -430,12 +442,15 @@
           width:36px; height:30px; min-height:0; padding:0; font-size:22px; line-height:1; border-radius:4px;
           background:#18181bcc; opacity:.45; transition:opacity .15s ease; }
         #menu:hover, #menu:focus-visible, :host([data-menu-open]) #menu { opacity:1; }
+        /* Like the player's own controls, reveal the button only while pointing at the video. */
+        @media (hover:hover) { :host(:not([data-menu-open]):not([data-pointer])) .bridge:not(:hover) #menu:not(:focus-visible) { opacity:0; } }
         #menu:active { transform:translateY(-50%); }
         .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
         :host([data-active]) .bridge { background:#0e0e10; pointer-events:auto; }
         :host([data-active]) .panel { display:none; left:auto; right:54px; top:50%; transform:translateY(-50%); z-index:3;
           width:min(360px,calc(100% - 64px)); max-height:calc(100% - 20px); background:#18181bfa; }
         :host([data-active][data-menu-open]) .panel { display:block; }
+        :host([data-active]) #subscription-status { display:none; }
         @container (max-width:480px) {
           .panel { top:6px; left:6px; width:calc(100% - 12px); }
           #direct { margin-left:0; }
@@ -477,13 +492,13 @@
     shadow.getElementById("channel-name").textContent = channel.displayName;
     // youtubeStreams stays unset until discovery; #direct is hidden without an href.
     if (channel.youtubeStreams) shadow.getElementById("direct").href = channel.youtubeStreams;
-    const collapse = shadow.getElementById("collapse");
-    collapse.addEventListener("click", () => {
-      const collapsed = !root.hasAttribute("data-collapsed");
-      root.toggleAttribute("data-collapsed", collapsed);
-      collapse.setAttribute("aria-expanded", String(!collapsed));
-      collapse.setAttribute("aria-label", collapsed ? "Stream Bridge ausklappen" : "Stream Bridge einklappen");
-      collapse.title = collapsed ? "Ausklappen" : "Einklappen";
+    applyCollapsed();
+    shadow.getElementById("collapse").addEventListener("click", () => {
+      collapsed = !collapsed;
+      collapseRevision += 1;
+      applyCollapsed();
+      // Remember the choice so the panel does not cover Twitch on every page.
+      try { void chrome.storage.local.set({ panelCollapsed: collapsed }).catch(() => {}); } catch {}
     });
     subscriptionStatus();
     subscriptionTimer = setInterval(() => { void pollSubscription(); }, 5_000);
@@ -568,6 +583,19 @@
     if (active && event.target instanceof HTMLMediaElement &&
         (mount?.contains(event.target) || event.target.closest(PREVIEW_SELECTOR))) silence(event.target);
   }, true);
+  window.addEventListener("message", (event) => {
+    const frame = shadow?.getElementById("youtube");
+    if (event.origin !== "https://www.youtube.com" || !frame || event.source !== frame.contentWindow ||
+        event.data?.type !== "stream-bridge-pointer") return;
+    clearTimeout(pointerTimer);
+    root.setAttribute("data-pointer", "");
+    // Hide again after a pause, matching the YouTube player's own controls.
+    pointerTimer = setTimeout(() => { root?.removeAttribute("data-pointer"); }, 2_500);
+  });
+  // The frame cannot reliably report leaving; Twitch's own DOM sees the return.
+  document.addEventListener("pointermove", (event) => {
+    if (root?.hasAttribute("data-pointer") && !event.composedPath().includes(root)) root.removeAttribute("data-pointer");
+  }, { passive: true });
   document.addEventListener("pointerdown", (event) => {
     if (active && root?.hasAttribute("data-menu-open") && !event.composedPath().includes(root)) setMenuOpen(false);
   });
@@ -587,6 +615,11 @@
   // older initial read. Failure leaves the manual controls available.
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes.panelCollapsed) {
+        collapseRevision += 1;
+        collapsed = changes.panelCollapsed.newValue === true;
+        applyCollapsed();
+      }
       if (area !== "local" || !changes.autoSwitchToYouTube) return;
       settingsRevision += 1;
       autoSwitch = changes.autoSwitchToYouTube.newValue === true;
@@ -594,7 +627,12 @@
       maybeAutoSwitch();
     });
     const revision = settingsRevision;
-    void chrome.storage.local.get({ autoSwitchToYouTube: false }).then((settings) => {
+    const collapseToken = collapseRevision;
+    void chrome.storage.local.get({ autoSwitchToYouTube: false, panelCollapsed: false }).then((settings) => {
+      if (collapseToken === collapseRevision) {
+        collapsed = settings.panelCollapsed === true;
+        applyCollapsed();
+      }
       if (revision !== settingsRevision) return;
       autoSwitch = settings.autoSwitchToYouTube === true;
       maybeAutoSwitch();
