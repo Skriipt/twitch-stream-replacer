@@ -137,9 +137,10 @@ export async function discoverLiveStream(channel, links = []) {
   if (urls.length > 5) throw new Error("Zu viele YouTube-Kanäle verlinkt. Bitte direkt auf YouTube auswählen.");
   const live = new Map();
   const confirmed = new Map();
-  // Do not silently pick a result if another linked channel cannot be checked.
-  for (const youtubeStreams of urls) {
-    const result = await resolveLiveStream({ ...channel, youtubeStreams });
+  // At most five channels are checked in parallel. Wait for all of them before
+  // selecting a stream so a slow/failed channel cannot hide an ambiguity.
+  const results = await Promise.all(urls.map((youtubeStreams) => resolveLiveStream({ ...channel, youtubeStreams })));
+  for (const result of results) {
     confirmed.set(result.channelId, result);
     if (result.state === "live") live.set(result.channelId, result);
   }

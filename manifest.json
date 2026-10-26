@@ -15,7 +15,7 @@
     {
       "matches": ["https://www.twitch.tv/*"],
       "js": ["config.js", "discovery.js", "content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_end"
     }
   ],
   "action": { "default_title": "Stream Bridge", "default_popup": "popup.html" }
