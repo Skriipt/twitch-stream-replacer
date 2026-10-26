@@ -29,7 +29,7 @@ async function page(t, initial = "not-subscribed", intercepted, settings) {
   window.clearInterval = (id) => { intervals.delete(id); };
   window.HTMLMediaElement.prototype.pause = () => { paused++; };
   window.chrome = {
-    storage: settings && { onChanged: { addListener() {} }, local: { get: async () => settings, set: async () => {} } },
+    storage: settings && { onChanged: { addListener() {} }, local: { get: async (defaults) => ({ ...defaults, ...settings }), set: async (updates) => { Object.assign(settings, updates); } } },
     runtime: {
       id: "extension", onMessage: { addListener: (fn) => { routeMessage = fn; } },
       sendMessage: async (message) => {
@@ -251,4 +251,44 @@ test("Erneut prüfen still forces a fresh lookup", async (t) => {
   const p = await page(t);
   await p.click("check");
   assert.equal(p.calls.filter((call) => call.type === "LOOKUP").at(-1).force, true);
+});
+
+test("the star adds and removes the channel from the favorites", async (t) => {
+  const settings = { favorites: ["colthavok"] };
+  const p = await page(t, "not-subscribed", undefined, settings);
+  const star = p.shadow.getElementById("favorite");
+  assert.equal(star.getAttribute("aria-pressed"), "false");
+  await p.click("favorite");
+  assert.deepEqual([...settings.favorites], ["colthavok", "stylerz"]);
+  assert.equal(star.getAttribute("aria-pressed"), "true");
+  assert.equal(star.textContent, "★");
+  await p.click("favorite");
+  assert.deepEqual([...settings.favorites], ["colthavok"]);
+  assert.equal(star.getAttribute("aria-pressed"), "false");
+});
+
+test("at most ten favorites are kept; the oldest is dropped", async (t) => {
+  const settings = { favorites: Array.from({ length: 10 }, (_, i) => `channel${i}`) };
+  const p = await page(t, "not-subscribed", undefined, settings);
+  await p.click("favorite");
+  assert.equal(settings.favorites.length, 10);
+  assert.equal(settings.favorites.at(-1), "stylerz");
+  assert.equal(settings.favorites.includes("channel0"), false);
+});
+
+test("timing marks follow the switch and the embed reports the first playing frame", async (t) => {
+  const p = await page(t);
+  await p.click("watch");
+  const root = p.window.document.getElementById("stylerz-bridge-prototype");
+  const marks = JSON.parse(root.getAttribute("data-timing"));
+  assert.deepEqual(Object.keys(marks), ["mounted", "lookup", "subscription", "switch", "suspended", "frame"].filter((key) => key in marks));
+  for (const key of ["mounted", "subscription", "lookup", "switch", "suspended", "frame"]) assert.equal(typeof marks[key], "number", key);
+  const frame = p.shadow.getElementById("youtube");
+  const logged = [];
+  p.window.console.info = (...args) => { logged.push(args); };
+  p.window.dispatchEvent(new p.window.MessageEvent("message", { origin: "https://www.youtube.com", source: frame.contentWindow, data: { type: "stream-bridge-playing" } }));
+  assert.equal(typeof JSON.parse(root.getAttribute("data-timing")).playing, "number");
+  assert.equal(logged.length, 1);
+  p.window.dispatchEvent(new p.window.MessageEvent("message", { origin: "https://evil.test", source: frame.contentWindow, data: { type: "stream-bridge-playing" } }));
+  assert.equal(logged.length, 1);
 });

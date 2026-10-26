@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Favorites: star a channel in its panel (up to ten, listed and removable in the popup). Opening any Twitch page checks their YouTube status in the background, at most every two minutes, so the result is ready when a favorite is opened.
+- A timing log of the switch (`mounted`, `subscription`, `lookup`, `switch`, `suspended`, `frame`, `loaded`, `playing`) in the console and the panel's `data-timing` attribute.
+
 ### Changed
 
+- Keep a live YouTube result for 90 seconds (other results 30 seconds), and let an automatic switch reuse a live result of that age.
 - Switch to YouTube sooner: retry an unconfirmed subscription state every 0.4 seconds for up to 12 seconds instead of waiting for the five-second poll, start the YouTube lookup while the subscription state loads, and let an automatic switch reuse the lookup that just found the stream.
 - Start the YouTube lookup as soon as a Twitch channel tab starts loading. Configured channels and channels whose profile links were seen before (the last 25 are remembered locally) are looked up before the page finishes rendering. This includes viewers who turn out to be subscribed; Twitch keeps playing for them.
 - Remember the collapsed panel across reloads, channels and Twitch tabs.

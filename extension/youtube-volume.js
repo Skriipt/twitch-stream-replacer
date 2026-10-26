@@ -17,6 +17,11 @@
   document.addEventListener("pointermove", reportPointer, { capture: true, passive: true });
   document.addEventListener("pointerdown", reportPointer, { capture: true, passive: true });
 
+  // First frame of real playback, for the Twitch page's timing log.
+  document.addEventListener("playing", () => {
+    window.parent.postMessage({ type: "stream-bridge-playing" }, "https://www.twitch.tv");
+  }, { capture: true, once: true });
+
   let hud = null;
   let hudTimer = 0;
 
