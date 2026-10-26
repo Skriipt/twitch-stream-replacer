@@ -25,13 +25,12 @@ Many streamers broadcast on Twitch and YouTube at the same time. This browser ex
 
 Requires Chrome 120 or later, or a compatible Chromium browser (Edge, Brave). No build step, backend, or API key.
 
-```sh
-git clone https://github.com/Skriipt/twitch-stream-replacer.git
-```
+1. Download **`stream-bridge-<version>.zip`** from the [latest release](https://github.com/Skriipt/twitch-stream-replacer/releases/latest) and extract it to a permanent folder.
+2. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`) and enable **Developer mode**.
+3. Select **Load unpacked** and choose the extracted folder containing **`manifest.json`**.
+4. Sign in to YouTube in the same browser profile, then reload the Twitch page.
 
-1. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`) and enable **Developer mode**.
-2. Select **Load unpacked** and choose the repository's **`extension/`** directory.
-3. Sign in to YouTube in the same browser profile, then reload the Twitch page.
+The release ZIP contains only the extension. You can also clone this repository and load its **`extension/`** directory.
 
 The [installation guide](docs/INSTALLATION.md) covers controls, favorites, updates, and cookie settings.
 
@@ -86,6 +85,8 @@ npm test                          # unit tests + headless Chromium tests
 ```
 
 `npm run test:unit` runs without a browser, `npm run test:browser` runs only the Chromium tests, and `npm run check` checks the extension syntax. The tests use controlled Twitch and YouTube fixtures; they do not establish live YouTube playback, sign-in, or Premium behavior.
+
+Every change set increments the extension version, normally by one patch. See [AGENTS.md](AGENTS.md) for the version policy and the [release guide](docs/RELEASING.md) for packaging and automatic GitHub publication.
 
 <details>
 <summary><strong>Repository layout</strong></summary>

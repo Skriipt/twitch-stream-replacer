@@ -1,9 +1,13 @@
 {
   "name": "stream-bridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": {
+    "version:bump": "node scripts/version.mjs bump",
+    "version:check": "node scripts/version.mjs check",
+    "release:notes": "node scripts/version.mjs notes",
+    "package:extension": "python3 scripts/package-extension.py",
     "icons": "node scripts/generate-icons.mjs",
     "test": "node --test tests/unit/*.test.js tests/browser/*.test.js",
     "test:unit": "node --test tests/unit/*.test.js",

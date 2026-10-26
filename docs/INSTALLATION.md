@@ -4,9 +4,9 @@ Stream Bridge is an unpacked Chromium Manifest V3 extension. Use Chrome 120 or l
 
 ## Install
 
-1. Download and fully extract the repository ZIP, or clone the repository.
+1. Download **`stream-bridge-<version>.zip`** from the [latest release](https://github.com/Skriipt/twitch-stream-replacer/releases/latest) and fully extract it to a permanent folder. Choose this asset rather than GitHub's **Source code** archives.
 2. Open `chrome://extensions` (Edge: `edge://extensions`; Brave: `brave://extensions`).
-3. Enable **Developer mode**, select **Load unpacked**, and choose the repository's **`extension/` directory**. This directory contains `manifest.json`; do not select the repository root.
+3. Enable **Developer mode**, select **Load unpacked**, and choose the extracted folder containing **`manifest.json`**. If you cloned the repository instead, choose its **`extension/` directory**.
 4. Open [YouTube](https://www.youtube.com/) in the same browser profile, choose the account you want to use, and complete any cookie consent prompt yourself.
 5. Open or reload a Twitch channel page. Stream Bridge looks for YouTube channel links in the loaded creator profile and info panels. If no links are found, open the channel's **About / Info** section; links loaded later are checked automatically.
 6. If a public YouTube livestream is available and the channel subscription check permits replacement, select **YouTube ansehen** (Watch on YouTube). Click Play in the player if necessary. Twitch chat stays available and YouTube uses the original player area.
@@ -45,7 +45,7 @@ For measuring, the page records the steps of a switch (`mounted`, `subscription`
 
 ## Update an existing installation
 
-Replace the files in the previously loaded extension directory with the new contents of `extension/`, then select **Reload ↻** on the browser's extensions page. If you previously loaded the repository root, remove that old entry and load **`extension/`** instead. Alternatively, disable the old version before loading the new directory. Keep only one version enabled, then reload Twitch.
+Download the new extension ZIP from the [latest release](https://github.com/Skriipt/twitch-stream-replacer/releases/latest), extract it, and replace the files in the previously loaded extension directory with its contents. Then select **Reload ↻** on the browser's extensions page and confirm the new version is displayed. For a cloned repository, use the updated contents of `extension/`. These unpacked installations need this manual update; GitHub releases do not automatically update the browser. Alternatively, disable the old version before loading a new directory. Keep only one version enabled, then reload Twitch.
 
 ## YouTube sign-in and Premium
 
