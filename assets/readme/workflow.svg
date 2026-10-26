@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="title desc">
+  <title id="title">How Twitch Stream Replacer works</title>
+  <desc id="desc">Four steps: read the Twitch channel, keep Twitch for subscribers, follow profile links to a live YouTube stream, then play YouTube while the Twitch chat stays.</desc>
+
+  <rect width="1200" height="240" rx="26" fill="#18181B"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <g transform="translate(64 35)">
+      <rect width="232" height="170" rx="14" fill="#1F1F23" stroke="#3F3F46" stroke-width="2"/>
+      <text x="22" y="52" font-size="40" font-weight="800" fill="#A78BFA">1</text>
+      <text x="22" y="94" font-size="22" font-weight="700" fill="#FAFAFA">Read the channel</text>
+      <text x="22" y="126" font-size="20" fill="#A1A1AA">you are watching</text>
+    </g>
+    <g transform="translate(344 35)">
+      <rect width="232" height="170" rx="14" fill="#1F1F23" stroke="#3F3F46" stroke-width="2"/>
+      <text x="22" y="52" font-size="40" font-weight="800" fill="#A78BFA">2</text>
+      <text x="22" y="94" font-size="22" font-weight="700" fill="#FAFAFA">Check sub status</text>
+      <text x="22" y="126" font-size="20" fill="#A1A1AA">subscribers stay</text>
+      <text x="22" y="150" font-size="20" fill="#A1A1AA">on Twitch</text>
+    </g>
+    <g transform="translate(624 35)">
+      <rect width="232" height="170" rx="14" fill="#1F1F23" stroke="#3F3F46" stroke-width="2"/>
+      <text x="22" y="52" font-size="40" font-weight="800" fill="#FF655C">3</text>
+      <text x="22" y="94" font-size="22" font-weight="700" fill="#FAFAFA">Find the stream</text>
+      <text x="22" y="126" font-size="20" fill="#A1A1AA">via profile links</text>
+      <text x="22" y="150" font-size="20" fill="#A1A1AA">to YouTube</text>
+    </g>
+    <g transform="translate(904 35)">
+      <rect width="232" height="170" rx="14" fill="#1F1F23" stroke="#FF655C" stroke-width="3"/>
+      <text x="22" y="52" font-size="40" font-weight="800" fill="#FF655C">4</text>
+      <text x="22" y="94" font-size="22" font-weight="700" fill="#FAFAFA">Switch</text>
+      <text x="22" y="126" font-size="20" fill="#A1A1AA">YouTube plays,</text>
+      <text x="22" y="150" font-size="20" fill="#A1A1AA">Twitch chat stays</text>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#71717A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M308 120H332M324 110L334 120L324 130"/>
+    <path d="M588 120H612M604 110L614 120L604 130"/>
+    <path d="M868 120H892M884 110L894 120L884 130"/>
+  </g>
+</svg>
