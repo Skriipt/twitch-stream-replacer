@@ -9,7 +9,9 @@
   // mounts. Retry quickly while it is unknown instead of waiting for the slow poll.
   const SUBSCRIPTION_RETRY_MS = 400;
   const SUBSCRIPTION_RETRY_LIMIT = 30;
-  const RECENT_LOOKUP_MS = 10_000;
+  // Matches the service worker's cache time for live results.
+  const RECENT_LOOKUP_MS = 90_000;
+  const FAVORITES_LIMIT = 10;
   if (window.top !== window || document.getElementById(ROOT_ID)) return;
 
   let root = null;
@@ -37,6 +39,11 @@
   let subscriptionTimer = null;
   let subscriptionRetries = 0;
   let subscriptionRetryTimer = 0;
+  let favorites = [];
+  // Milliseconds since navigation start (first load) or since the SPA route
+  // change. Read the result from the console or the root's data-timing.
+  let routeStart = 0;
+  let marks = {};
   const mutedVideos = new Map();
 
   function isChannel() {
@@ -65,10 +72,42 @@
     return reply.result;
   }
 
+  function mark(name) {
+    if (name in marks) return;
+    marks[name] = Math.round(performance.now() - routeStart);
+    root?.setAttribute("data-timing", JSON.stringify(marks));
+    if (name === "playing") console.info("[Stream Bridge] Timing (ms)", { ...marks });
+  }
+
   function status(message) {
     if (shadow) {
       shadow.getElementById("status").textContent = message;
       shadow.getElementById("announcement").textContent = message;
+    }
+  }
+
+  function applyFavorite() {
+    const button = shadow?.getElementById("favorite");
+    if (!button || !channel) return;
+    const on = favorites.includes(channel.twitchLogin);
+    button.setAttribute("aria-pressed", String(on));
+    button.setAttribute("aria-label", on ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen");
+    button.title = on ? "Favorit" : "Als Favorit merken";
+    button.textContent = on ? "★" : "☆";
+  }
+
+  async function toggleFavorite() {
+    const login = channel.twitchLogin;
+    try {
+      // Read again: another tab or the popup may have changed the list.
+      const stored = (await chrome.storage.local.get({ favorites: [] })).favorites;
+      const current = Array.isArray(stored) ? stored : [];
+      const next = current.includes(login) ? current.filter((name) => name !== login) : [...current, login].slice(-FAVORITES_LIMIT);
+      await chrome.storage.local.set({ favorites: next });
+      favorites = next;
+      applyFavorite();
+    } catch {
+      status(RELOAD_MESSAGE);
     }
   }
 
@@ -129,6 +168,7 @@
       catch (error) { result = { state: "unknown", error: error.message }; }
       if (token !== generation || !isChannel()) return { state: "unknown" };
       subscription = result;
+      if (result.state !== "unknown") mark("subscription");
       subscriptionStatus();
       return result;
     })();
@@ -206,6 +246,7 @@
     clearTimeout(subscriptionRetryTimer);
     subscriptionRetryTimer = 0;
     subscriptionRetries = 0;
+    marks = {};
     root?.remove();
     root = null;
     shadow = null;
@@ -255,7 +296,7 @@
     // the background worker caches it, so a retry reuses the result. Known
     // subscribers skip it. The result is only used once not-subscribed is confirmed.
     const lookup = subscription.state === "subscribed" ? null : send("LOOKUP", { force, youtubeLinks: links });
-    lookup?.catch(() => {});
+    lookup?.then(() => { if (token === generation) mark("lookup"); }, () => {});
     try {
       const viewer = await refreshSubscription();
       if (token !== generation || !isChannel()) return;
@@ -285,6 +326,7 @@
     const token = generation;
     switching = true;
     syncButtons();
+    mark("switch");
     status("Wechsle zu YouTube …");
     try {
       const viewer = await refreshSubscription();
@@ -340,6 +382,7 @@
         location.reload();
         return;
       }
+      mark("suspended");
       active = true;
       setActiveLayout(true);
       setMenuOpen(false);
@@ -359,10 +402,11 @@
       frame.allowFullscreen = true;
       frame.referrerPolicy = "strict-origin-when-cross-origin";
       frame.addEventListener("load", () => {
-        if (active && frame.isConnected) status("YouTube-Player geöffnet. Falls nötig im Player auf Play klicken.");
+        if (active && frame.isConnected) { mark("loaded"); status("YouTube-Player geöffnet. Falls nötig im Player auf Play klicken."); }
       });
       shadow.getElementById("screen").replaceChildren(frame);
       shadow.getElementById("screen").hidden = false;
+      mark("frame");
       status("YouTube wird geladen. Premium hängt von deiner YouTube-Anmeldung und den Cookie-Einstellungen ab.");
     } catch (error) {
       if (token === generation) {
@@ -444,6 +488,7 @@
         #collapse svg { width:14px; height:14px; transition:transform .15s ease; }
         :host([data-collapsed]) #collapse svg { transform:rotate(-90deg); }
         :host([data-active]) #collapse { display:none; }
+        #favorite[aria-pressed="true"] { color:var(--wait); }
         .body { margin-top:8px; }
         :host([data-collapsed]:not([data-active])) .body { display:none; }
         :host([data-collapsed]:not([data-active])) .panel { width:auto; max-width:calc(100% - 20px); padding:4px 4px 4px 10px; background:#18181bd9; }
@@ -499,6 +544,7 @@
             <span class="dot" aria-hidden="true"></span>
             <span class="title"><strong id="channel-name">Stream Bridge</strong><span class="sub">Stream Bridge · Prototyp</span></span>
             <span class="live-badge" aria-hidden="true">Live</span>
+            <button id="favorite" class="icon-btn" type="button" aria-pressed="false" aria-label="Zu Favoriten hinzufügen" title="Als Favorit merken">☆</button>
             <button id="collapse" class="icon-btn" type="button" aria-label="Stream Bridge einklappen" aria-expanded="true" aria-controls="bridge-body" title="Einklappen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <button id="close-menu" class="icon-btn" type="button" aria-label="Menü schließen" title="Schließen" hidden>×</button>
           </div>
@@ -524,6 +570,9 @@
     // youtubeStreams stays unset until discovery; #direct is hidden without an href.
     if (channel.youtubeStreams) shadow.getElementById("direct").href = channel.youtubeStreams;
     applyCollapsed();
+    applyFavorite();
+    mark("mounted");
+    shadow.getElementById("favorite").addEventListener("click", () => { void toggleFavorite(); });
     shadow.getElementById("collapse").addEventListener("click", () => {
       collapsed = !collapsed;
       collapseRevision += 1;
@@ -594,6 +643,7 @@
       route = location.pathname;
       if (channel?.twitchLogin !== next?.twitchLogin) {
         teardown();
+        if (channel) routeStart = performance.now();
         channel = next;
       }
       schedule();
@@ -616,8 +666,9 @@
   }, true);
   window.addEventListener("message", (event) => {
     const frame = shadow?.getElementById("youtube");
-    if (event.origin !== "https://www.youtube.com" || !frame || event.source !== frame.contentWindow ||
-        event.data?.type !== "stream-bridge-pointer") return;
+    if (event.origin !== "https://www.youtube.com" || !frame || event.source !== frame.contentWindow) return;
+    if (event.data?.type === "stream-bridge-playing") { mark("playing"); return; }
+    if (event.data?.type !== "stream-bridge-pointer") return;
     clearTimeout(pointerTimer);
     root.setAttribute("data-pointer", "");
     // Hide again after a pause, matching the YouTube player's own controls.
@@ -651,6 +702,10 @@
         collapsed = changes.panelCollapsed.newValue === true;
         applyCollapsed();
       }
+      if (area === "local" && changes.favorites) {
+        favorites = Array.isArray(changes.favorites.newValue) ? changes.favorites.newValue : [];
+        applyFavorite();
+      }
       if (area !== "local" || !changes.autoSwitchToYouTube) return;
       settingsRevision += 1;
       autoSwitch = changes.autoSwitchToYouTube.newValue === true;
@@ -659,7 +714,9 @@
     });
     const revision = settingsRevision;
     const collapseToken = collapseRevision;
-    void chrome.storage.local.get({ autoSwitchToYouTube: false, panelCollapsed: false }).then((settings) => {
+    void chrome.storage.local.get({ autoSwitchToYouTube: false, panelCollapsed: false, favorites: [] }).then((settings) => {
+      favorites = Array.isArray(settings.favorites) ? settings.favorites : [];
+      applyFavorite();
       if (collapseToken === collapseRevision) {
         collapsed = settings.panelCollapsed === true;
         applyCollapsed();

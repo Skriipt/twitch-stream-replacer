@@ -3,6 +3,10 @@ import { discoverLiveStream } from "./resolver.js";
 import { detectSubscription } from "./subscriber.js";
 
 const CONFIG = globalThis.StylerzBridgeConfig;
+// A confirmed live result stays usable longer than a negative one: a missed
+// new broadcast is worse than a slightly older "live" for a running stream.
+const LIVE_TTL_MS = 90_000;
+const OFFLINE_TTL_MS = 30_000;
 const cached = new Map();
 const pending = new Map();
 let ruleQueue = Promise.resolve();
@@ -53,7 +57,7 @@ async function lookup(channel, force = false, links = []) {
   // Configured channels ignore profile links, so they must not split the cache.
   const key = JSON.stringify([channel.twitchLogin, channel.channelId ? [] : urls]);
   const previous = cached.get(key);
-  if (!force && previous && Date.now() - previous.checkedAt < 30_000) return previous;
+  if (!force && previous && Date.now() - previous.checkedAt < (previous.state === "live" ? LIVE_TTL_MS : OFFLINE_TTL_MS)) return previous;
   if (!pending.has(key)) {
     pending.set(key, discoverLiveStream(channel, urls).then((result) => {
       const value = { ...result, twitchLogin: channel.twitchLogin, checkedAt: Date.now() };
@@ -93,6 +97,30 @@ async function prewarm(url) {
   const urls = channel.channelId ? [] : (await knownLinks())[channel.twitchLogin];
   if (!Array.isArray(urls) || (!channel.channelId && urls.length === 0)) return;
   await lookup(channel, false, urls);
+}
+
+// Look up the user's favorite channels as soon as any Twitch page opens, so a
+// later click on one of them finds the result ready. Channels without a known
+// YouTube link are skipped until their page has been visited once.
+const WARM_INTERVAL_MS = 120_000;
+const WARM_CONCURRENCY = 3;
+let lastWarm = 0;
+async function warmFavorites() {
+  if (Date.now() - lastWarm < WARM_INTERVAL_MS) return;
+  lastWarm = Date.now();
+  let logins;
+  try { logins = (await chrome.storage.local.get({ favorites: [] })).favorites; } catch { return; }
+  if (!Array.isArray(logins) || logins.length === 0) return;
+  const known = await knownLinks();
+  const targets = [];
+  for (const login of logins.slice(0, 10)) {
+    const channel = typeof login === "string" && CONFIG.channelForUrl(`https://www.twitch.tv/${login}`);
+    const urls = channel && (channel.channelId ? [] : known[login]);
+    if (channel && Array.isArray(urls) && (channel.channelId || urls.length > 0)) targets.push({ channel, urls });
+  }
+  for (let i = 0; i < targets.length; i += WARM_CONCURRENCY) {
+    await Promise.allSettled(targets.slice(i, i + WARM_CONCURRENCY).map(({ channel, urls }) => lookup(channel, false, urls)));
+  }
 }
 
 // All tabs share the rule ID space. Serialize updates globally so simultaneous
@@ -178,7 +206,8 @@ chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
     void chrome.tabs.sendMessage(tabId, { type: "ROUTE_CHANGED" }, { frameId: 0 }).catch(() => {});
   }
   const url = change.url ?? (change.status === "loading" ? tab?.url : undefined);
-  if (url?.startsWith("https://www.twitch.tv/")) void prewarm(url).catch(() => {});
+  // The opened channel goes first; favorites follow so they do not compete for bandwidth.
+  if (url?.startsWith("https://www.twitch.tv/")) void prewarm(url).catch(() => {}).then(warmFavorites).catch(() => {});
   // Clear on any real navigation/reload, including a reload of /stylerz itself.
   if (change.status === "loading" || (change.url && !isChannel(change.url))) {
     void setSuspended(tabId, false).catch(() => {});

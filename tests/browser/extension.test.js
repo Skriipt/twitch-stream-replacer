@@ -134,6 +134,10 @@ test("loaded extension discovers late profile links, switches video and preserve
   await expect(page.locator(`${root} #status`)).toBeVisible();
   await page.locator(`${root} #watch`).click();
   await expect(page.locator(`${root} iframe`)).toHaveAttribute("src", new RegExp(`/embed/${VIDEO}`));
+  // The embed reports its first playing frame; the page records it in its timing log.
+  await page.frameLocator(`${root} iframe`).locator("video").evaluate((video) => video.dispatchEvent(new Event("playing")));
+  await expect.poll(async () => Object.keys(JSON.parse(await page.locator(`${root}`).evaluate((element) => element.getAttribute("data-timing")))))
+    .toEqual(expect.arrayContaining(["mounted", "subscription", "lookup", "switch", "suspended", "frame", "loaded", "playing"]));
   await expect(page.locator("html")).toHaveAttribute("data-stream-bridge-active", "");
   await expect(page.locator(".picture-by-picture-player")).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Chat" })).toBeVisible();
@@ -621,6 +625,25 @@ test("automatic playback follows Twitch's subscription data within a second inst
   await setAutomatic(popup, false);
   await close(page);
   await popup.close();
+});
+
+test("favorites are starred on the channel page, listed in the popup and removable there", async () => {
+  await mockYouTube({});
+  const page = await open("favstar");
+  const star = page.locator(`${root} #favorite`);
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await expect(page.locator(`${root} #favorite`)).toHaveAttribute("aria-pressed", "true");
+  const popup = await openPopup();
+  await expect(popup.locator("#favorites li")).toHaveText(/favstar/);
+  await popup.getByRole("button", { name: "favstar aus Favoriten entfernen" }).click();
+  await expect(popup.locator("#favorites li")).toHaveCount(0);
+  await expect(popup.locator("#favorites-empty")).toBeVisible();
+  await expect(page.locator(`${root} #favorite`)).toHaveAttribute("aria-pressed", "false");
+  await popup.close();
+  await close(page);
 });
 
 test("disabling automatic playback during the initial lookup never suspends Twitch", async () => {

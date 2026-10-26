@@ -75,6 +75,12 @@ The regular YouTube player uses the browser profile's YouTube session. The exten
 > [!IMPORTANT]
 > The extension cannot verify or enforce YouTube Premium benefits. Whether the embedded player can use the signed-in session depends on factors including cookie settings. The project does not guarantee ad-free playback.
 
+### Favorites and faster switching
+
+Click the star in the panel of a channel page to mark it as a favorite (up to ten; the popup lists and removes them). Whenever a Twitch page opens, the extension checks the favorites' YouTube status in the background, at most every two minutes, so the result is ready when you open one. Favorites need a known YouTube link, which the extension remembers after the first visit to the channel; STYLERZ and ColtHavok are always known. This is the only recurring YouTube request, and only while you browse Twitch. Without favorites, the extension only looks up the channel you open.
+
+For measuring, the page records the steps of a switch (`mounted`, `subscription`, `lookup`, `switch`, `suspended`, `frame`, `loaded`, `playing`) in milliseconds since navigation start. The console prints them as `[Stream Bridge] Timing (ms)` when the YouTube player starts, and the panel's `data-timing` attribute holds them.
+
 ## Permissions and data
 
 | Access | Purpose |
@@ -82,7 +88,7 @@ The regular YouTube player uses the browser profile's YouTube session. The exten
 | `www.twitch.tv` | Identify the channel and insert the controls and player. |
 | `www.youtube.com` | Fetch channel and stream metadata. |
 | `*.ttvnw.net` and `declarativeNetRequestWithHostAccess` | Temporarily block Twitch video requests in the relevant tab. |
-| `storage` | Save the automatic playback preference locally and remember a tab's deliberate return to Twitch for the browser session. |
+| `storage` | Save the automatic playback preference and favorites locally and remember a tab's deliberate return to Twitch for the browser session. |
 | `scripting` | Read the subscription state in the Twitch page's JavaScript context, using the existing Twitch host permission. |
 
 The extension has no backend of its own and collects no telemetry. It does not have permission to read cookies. The browser may attach its existing YouTube session to requests; the embedded player connects directly to YouTube.

@@ -1,6 +1,6 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { listing, player, pageJson, profileUrl, publicResponse, VIDEO } from "../fixtures.js";
+import { listing, player, pageJson, profileUrl, publicResponse, SECOND_VIDEO, VIDEO } from "../fixtures.js";
 const STYLERZ = "UC6NBwF9A5P2ni8YRvVHgvsA";
 const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(setImmediate); };
 const originalFetch = globalThis.fetch;
@@ -152,7 +152,7 @@ test("profile links are remembered so the next visit prewarms an unconfigured ch
   await settle();
   assert.deepEqual(app.local.knownProfileLinks, { creator: [profileUrl] });
   const now = Date.now();
-  Date.now = () => now + 60_000;
+  Date.now = () => now + 100_000;
   app.listeners.updated(1, { url: "https://www.twitch.tv/creator" }, app.tabs.get(1));
   await settle();
   assert.equal(count, 4);
@@ -170,4 +170,60 @@ test("remembered profile links are capped", async () => {
   assert.equal(logins.length, 25);
   assert.equal(logins.at(-1), "creator29");
   assert.equal(logins.includes("creator0"), false);
+});
+
+test("opening any Twitch page looks up favorites once per interval and skips channels without known links", async () => {
+  const app = await worker();
+  Object.assign(app.local, {
+    favorites: ["stylerz", "creator", "nolinks", "Bad Login!", 7],
+    knownProfileLinks: { creator: [profileUrl] },
+  });
+  const fetched = [];
+  globalThis.fetch = async (url) => {
+    fetched.push(url);
+    const stylerz = url.includes("STYLERZlive") || url.includes(SECOND_VIDEO);
+    return publicResponse(url, url.includes("/watch?")
+      ? pageJson("ytInitialPlayerResponse", stylerz ? player(STYLERZ, SECOND_VIDEO) : player())
+      : pageJson("ytInitialData", stylerz ? listing(STYLERZ, [SECOND_VIDEO]) : listing()));
+  };
+  app.tabs.set(4, { url: "https://www.twitch.tv/" });
+  app.listeners.updated(4, { url: "https://www.twitch.tv/" }, app.tabs.get(4));
+  await settle();
+  assert.equal(fetched.length, 4, "two lookups of two requests each; nothing for the other entries");
+  app.listeners.updated(4, { url: "https://www.twitch.tv/directory/following" }, app.tabs.get(4));
+  await settle();
+  assert.equal(fetched.length, 4, "no repeat within the interval");
+  // The channel opened later finds the favorite's result in the cache.
+  app.tabs.set(5, { url: "https://www.twitch.tv/stylerz" });
+  const reply = await app.message({ type: "LOOKUP", twitchLogin: "stylerz", youtubeLinks: [] }, 5);
+  assert.equal(reply.error, undefined);
+  assert.equal(reply.result.state, "live");
+  assert.equal(fetched.length, 4);
+});
+
+test("a live result stays valid for 90 seconds, a negative one for 30", async () => {
+  const app = await worker();
+  let live = true;
+  let count = 0;
+  globalThis.fetch = async (url) => {
+    count += 1;
+    return publicResponse(url, url.includes("/watch?") ? pageJson("ytInitialPlayerResponse", player()) : pageJson("ytInitialData", listing(undefined, live ? [VIDEO] : [])));
+  };
+  const fields = { type: "LOOKUP", twitchLogin: "creator", youtubeLinks: [profileUrl] };
+  const now = Date.now();
+  await app.message(fields);
+  const after = count;
+  Date.now = () => now + 80_000;
+  await app.message(fields);
+  assert.equal(count, after, "live result reused after 80s");
+  Date.now = () => now + 100_000;
+  live = false;
+  assert.equal((await app.message(fields)).result.state, "offline");
+  const offline = count;
+  Date.now = () => now + 120_000;
+  await app.message(fields);
+  assert.equal(count, offline, "offline result reused after 20s");
+  Date.now = () => now + 140_000;
+  await app.message(fields);
+  assert.ok(count > offline, "offline result refetched after 40s");
 });
