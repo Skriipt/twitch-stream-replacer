@@ -9,6 +9,7 @@ Updated: October 26, 2026. Version 0.3.0 adds profile-based channel discovery an
 - The resolver verifies channel identity, live status, and embedding support for up to five distinct channel URLs. Multiple live channels or a failed check leave Twitch playing.
 - A compact, collapsible panel and an overlay menu preserve the full player area. The toolbar popup explains discovery and YouTube sign-in.
 - The active menu button sits halfway down the right edge to avoid YouTube's corner controls. Mouse-wheel input over the Stream Bridge embed changes volume by one percentage point per event, clamps to 0–100%, mutes at zero, and unmutes when raised. A narrowly scoped content script handles wheel events inside the cross-origin embed using the existing YouTube permission.
+- Wheel volume uses the embedded player's `getVolume`, `isMuted`, `setVolume`, `mute`, and `unMute` methods in the page's `MAIN` world. This updates YouTube's state and controls together, avoiding later resets caused by changing the HTML video element alone. The handler ignores input until usable player methods are present. The `movie_player` element is a YouTube implementation detail and may require adaptation if YouTube changes it; the volume method contracts are described in the [YouTube Player API reference](https://developers.google.com/youtube/iframe_api_reference#Changing_the_player_volume).
 - The subscription guard keeps Twitch playback for active channel subscribers. Missing or uncertain player data blocks replacement; see [subscription detection](SUBSCRIBER_DETECTION.md) for the state contract and evidence.
 
 Discovery only reads direct channel URLs in the currently loaded profile. Open **About / Info** when links are missing. Name-based search, link aggregators, individual video links, and periodic YouTube discovery polling are not implemented. **Erneut prüfen** (Check again) starts a new lookup after a previous one finishes.
@@ -38,7 +39,7 @@ npm test
 
 These checks establish fixture behavior and real Chromium extension integration. They do not establish authenticated Twitch behavior, real subscription purchases/expirations, YouTube playback, Premium benefits, or behavior during actual Twitch ad breaks.
 
-Player-control regressions additionally exercise clickable native corner controls at 960×540, 400×225, and 320×180; real mouse-wheel input inside a cross-origin embed; exact 1% steps, mute/unmute and volume limits; and isolation from unrelated YouTube embeds and standalone players. These use synthetic player controls and an HTML video element, rather than live YouTube playback.
+Player-control regressions additionally exercise clickable native corner controls at 960×540, 400×225, and 320×180; real mouse-wheel input inside a cross-origin embed; exact 1% steps, mute/unmute and volume limits; and isolation from unrelated YouTube embeds and standalone players. The fixture keeps player state separate from its HTML video element and reapplies that state after wheel input to catch volume resets and stale UI indicators. It also checks readiness and verifies that wheel steps start from player volume when media volume differs. These use synthetic player controls, rather than live YouTube playback.
 
 ## Previous live observations
 
@@ -47,6 +48,8 @@ During the original 0.3.0 discovery work, Chromium screenshots were inspected at
 A loaded-extension attempt on the real Twitch page found the profile link but could not reach YouTube from a fresh Chromium profile. **Real YouTube playback, Premium sign-in, and Twitch ad breaks were not confirmed by that attempt.** A successful Node metadata request does not replace browser validation.
 
 The automatic-switching and icon work also inspected popup and icon screenshots. Its browser checks used controlled fixtures and did not perform a new live Twitch/YouTube playback check.
+
+A follow-up wheel-volume check loaded the current YouTube embed in a fresh Chromium extension profile. Its `movie_player` exposed all five volume/mute methods. Real mouse-wheel input changed the player-reported state from muted at 50% to unmuted at 1%, then 2%, back to 1%, and muted at 0%. A separate method-order probe confirmed that calling `unMute` after setting 1% raises it to 5%; the handler therefore unmutes before setting the requested volume. The embed showed a playback error, so this confirms current player-method integration, not audible live playback or signed-in behavior.
 
 Subscription work on October 26, 2026 separately confirmed `not-subscribed` for a live ColtHavok stream in a fresh signed-out Chromium profile. Offline STYLERZ lacked channel-specific player data and remained `unknown`. Authenticated subscription behavior still requires manual validation; details and source evidence are recorded in the subscription document.
 

@@ -25,6 +25,8 @@ During YouTube playback, a small **⋯ button halfway down the right edge** open
 
 Hover over the YouTube player and scroll up to raise the volume or down to lower it in **1-percentage-point steps**. Volume stops at 100%; reaching 0% mutes playback, and scrolling up unmutes at 1%. The next step starts from the current volume, including changes made with YouTube's controls. Scrolling over Twitch chat or the Stream Bridge menu keeps its normal behavior. Ctrl/Command-scroll remains available for browser zoom. This control applies only to the embedded player opened by Stream Bridge.
 
+Wheel changes use the YouTube player's own volume and mute methods so its slider, mute indicator, and playback state stay synchronized. Volume control becomes available once those methods are ready.
+
 Twitch's small ad preview above chat is hidden during YouTube playback and its space is released. Leaving YouTube mode restores Twitch's own layout.
 
 If no public YouTube livestream is available, Twitch keeps playing. **Erneut prüfen** (Check again) starts another lookup; there is no periodic YouTube discovery polling. The panel's arrow collapses it to a small channel indicator. STYLERZ and ColtHavok also retain their configured fallback mappings.
