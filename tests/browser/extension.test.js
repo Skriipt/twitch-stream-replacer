@@ -264,6 +264,9 @@ test("wheel changes survive player reconciliation and keep native mute and volum
     const video = frame.locator("video");
     const mute = frame.getByRole("button", { name: "Mute", exact: true });
     const volume = frame.getByRole("slider", { name: "Volume", exact: true });
+    // The controls exist before the fixture binds their handlers. Its initial
+    // media volume is set last, so wait for initialization before the click.
+    await expect(video).toHaveJSProperty("volume", 0.5);
     await mute.click();
     await expect(video).toHaveJSProperty("muted", true);
     await video.hover();
