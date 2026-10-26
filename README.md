@@ -3,86 +3,86 @@
 
 # Twitch Stream Replacer
 
-**YouTube-Livestreams auf Twitch ansehen und den Twitch-Chat behalten.**
+**Watch YouTube livestreams on Twitch while keeping the Twitch chat.**
 
-[Projektidee](#projektidee) · [Ziel](#ziel) · [Installation](#installation) · [Entwicklung](#entwicklung)
+[Overview](#overview) · [Goals](#goals) · [Installation](#installation) · [Development](#development)
 </div>
 
-## Projektidee
+## Overview
 
-Viele Streamer übertragen gleichzeitig auf Twitch und YouTube. Twitch Stream Replacer verbindet die YouTube-Wiedergabe mit der gewohnten Twitch-Seite: Der YouTube-Livestream wird im Videobereich abgespielt, während der native Twitch-Chat daneben erhalten bleibt.
+Many streamers broadcast on Twitch and YouTube at the same time. Twitch Stream Replacer brings YouTube playback to the familiar Twitch page: the YouTube livestream plays in the video area while the native Twitch chat remains available alongside it.
 
-Die Aufgabe der Browser-Erweiterung ist es, den passenden YouTube-Livestream zu finden, einen einfachen Wechsel zwischen den Playern zu ermöglichen und die parallele Twitch-Wiedergabe anzuhalten. Die Twitch-Seite bleibt der zentrale Ort zum Zuschauen und Chatten.
+The browser extension finds the corresponding YouTube livestream, makes it easy to switch between players, and pauses Twitch playback in the background. The Twitch page remains the central place to watch and chat.
 
-## Ziel
+## Goals
 
-Das Projekt soll die Wahl der Videoplattform vom verwendeten Chat trennen. Wer die Wiedergabe auf YouTube bevorzugt, soll dafür die Twitch-Community und die vertraute Chat-Oberfläche nicht verlassen müssen.
+The project aims to let viewers choose their video platform independently of their chat platform. Viewers who prefer YouTube playback should be able to keep participating in the Twitch community through its familiar chat interface.
 
-Zum angestrebten Funktionsumfang gehören:
+The intended feature set includes:
 
-- **Passende Livestreams finden:** Twitch- und YouTube-Kanäle zuverlässig zuordnen und laufende Übertragungen erkennen.
-- **Einfach wechseln:** Den YouTube-Player auf der Twitch-Seite verwenden und jederzeit zur Twitch-Wiedergabe zurückkehren.
-- **Die vorhandene YouTube-Anmeldung nutzen:** Die Wiedergabe über den normalen YouTube-Player und die Sitzung des Browserprofils ermöglichen.
-- **Doppelte Wiedergabe vermeiden:** Twitch-Video und -Ton während der YouTube-Wiedergabe anhalten.
-- **Video und Chat zeitlich abstimmen:** Künftig eine manuelle Zeitanpassung anbieten, um den Versatz zwischen beiden Plattformen zu reduzieren.
+- **Find matching livestreams:** Reliably associate Twitch and YouTube channels and detect active broadcasts.
+- **Switch easily:** Use the YouTube player on the Twitch page and return to Twitch playback at any time.
+- **Use the existing YouTube sign-in:** Play streams through the regular YouTube player using the browser profile's session.
+- **Avoid duplicate playback:** Pause Twitch video and audio while YouTube playback is active.
+- **Align video and chat:** Add manual timing adjustments in the future to help reduce the delay between platforms.
 
 > [!NOTE]
-> Das Projekt befindet sich in Entwicklung. Den aktuellen Implementierungsstand, Prüfergebnisse und offene Arbeiten beschreibt der [Projektstand](docs/PROJECT_STATUS.md).
+> The project is under development. See [Project status](docs/PROJECT_STATUS.md) for the current implementation, validation results, and remaining work.
 
-## Funktionsprinzip
+## How it works
 
-1. Die Erweiterung erkennt den geöffneten Twitch-Kanal.
-2. Sie prüft den zugeordneten YouTube-Kanal auf einen laufenden Livestream.
-3. Nach dem Wechsel wird der YouTube-Player in den Twitch-Videobereich eingesetzt; der native Chat bleibt verfügbar.
-4. Über ein kompaktes Menü lässt sich zur Twitch-Wiedergabe zurückkehren oder der Stream direkt auf YouTube öffnen.
+1. The extension identifies the Twitch channel being viewed.
+2. It checks the associated YouTube channel for an active livestream.
+3. After switching, the YouTube player replaces the Twitch video area while the native chat remains available.
+4. A compact menu lets the viewer return to Twitch playback or open the stream directly on YouTube.
 
 ## Installation
 
-Die Erweiterung basiert auf Chromium Manifest V3. Voraussetzung ist Chrome ab Version 120 oder ein kompatibler Chromium-Browser. Für den aktuellen Quellcode sind kein Build, kein Backend und kein API-Schlüssel erforderlich.
+The extension uses Chromium Manifest V3 and requires Chrome 120 or later, or a compatible Chromium browser. The current source requires no build step, backend, or API key.
 
-1. Repository herunterladen und entpacken oder klonen:
+1. Download and extract the repository, or clone it:
 
    ```sh
    git clone https://github.com/Skriipt/twitch-stream-replacer.git
    ```
 
-2. `chrome://extensions` öffnen; in Edge `edge://extensions`, in Brave `brave://extensions`.
-3. **Entwicklermodus** aktivieren und **Entpackte Erweiterung laden** wählen.
-4. Den Projektordner auswählen, in dem `manifest.json` liegt.
-5. Im selben Browserprofil auf YouTube anmelden und anschließend die Twitch-Seite neu laden.
+2. Open `chrome://extensions`, `edge://extensions` in Edge, or `brave://extensions` in Brave.
+3. Enable **Developer mode** and select **Load unpacked**.
+4. Select the project folder containing `manifest.json`.
+5. Sign in to YouTube in the same browser profile, then reload the Twitch page.
 
-Die [Installationsanleitung](INSTALLATION.md) erklärt die Bedienung des aktuellen Prototyps, Updates und die nötigen Cookie-Einstellungen.
+The [installation guide](INSTALLATION.md) covers the current prototype's controls, updates, and required cookie settings. The guide is currently in German.
 
-## YouTube-Anmeldung und Premium
+## YouTube sign-in and Premium
 
-Der normale YouTube-Player verwendet die YouTube-Sitzung des Browserprofils. Die Erweiterung verlangt dafür keine Zugangsdaten und liest keine Cookie-Werte aus.
+The regular YouTube player uses the browser profile's YouTube session. The extension does not request account credentials or read cookie values.
 
 > [!IMPORTANT]
-> YouTube Premium wird von der Erweiterung weder geprüft noch erzwungen. Ob die Anmeldung im eingebetteten Player verfügbar ist, hängt unter anderem von den Cookie-Einstellungen ab. Das Projekt garantiert keine Werbefreiheit.
+> The extension cannot verify or enforce YouTube Premium benefits. Whether the embedded player can use the signed-in session depends on factors including cookie settings. The project does not guarantee ad-free playback.
 
-## Berechtigungen und Daten
+## Permissions and data
 
-| Zugriff | Zweck |
+| Access | Purpose |
 | --- | --- |
-| `www.twitch.tv` | Kanal erkennen sowie Umschalter und Player einfügen. |
-| `www.youtube.com` | Kanal- und Stream-Metadaten abrufen. |
-| `*.ttvnw.net` und `declarativeNetRequestWithHostAccess` | Twitch-Videodaten vorübergehend im jeweiligen Tab anhalten. |
+| `www.twitch.tv` | Identify the channel and insert the controls and player. |
+| `www.youtube.com` | Fetch channel and stream metadata. |
+| `*.ttvnw.net` and `declarativeNetRequestWithHostAccess` | Temporarily block Twitch video requests in the relevant tab. |
 
-Die Erweiterung verwendet kein eigenes Backend und keine Telemetrie. Sie besitzt keine Cookie-Leseberechtigung. Der Browser kann seine bestehende YouTube-Sitzung bei Abfragen mitsenden; der eingebettete Player verbindet sich direkt mit YouTube.
+The extension has no backend of its own and collects no telemetry. It does not have permission to read cookies. The browser may attach its existing YouTube session to requests; the embedded player connects directly to YouTube.
 
-## Entwicklung
+## Development
 
-Das Projekt besteht aus JavaScript und HTML ohne externe Laufzeitabhängigkeiten.
+The project consists of JavaScript and HTML with no external runtime dependencies.
 
-| Datei | Aufgabe |
+| File | Purpose |
 | --- | --- |
-| `manifest.json` | Manifest V3, Berechtigungen und Einstiegspunkte. |
-| `config.js` | Zuordnungen zwischen Twitch- und YouTube-Kanälen. |
-| `resolver.js` | YouTube-Metadaten lesen und Livestreams validieren. |
-| `background.js` | Service Worker, Suchergebnis-Cache und tabbezogene Netzwerkregeln. |
-| `content.js` | Player-Austausch, Menü, Mediensteuerung und Kanalwechsel. |
-| `popup.html` | Einstieg über das Erweiterungssymbol. |
+| `manifest.json` | Manifest V3 configuration, permissions, and entry points. |
+| `config.js` | Mappings between Twitch and YouTube channels. |
+| `resolver.js` | Read YouTube metadata and validate livestreams. |
+| `background.js` | Service worker, lookup cache, and per-tab network rules. |
+| `content.js` | Player replacement, menu, media controls, and channel navigation. |
+| `popup.html` | Entry point through the extension's toolbar icon. |
 
-Nach Änderungen die Erweiterung auf der Erweiterungsseite neu laden und Twitch aktualisieren. Technische Einschränkungen und der bisherige Prüfstand sind in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) dokumentiert.
+After editing files, reload the extension on the browser's extensions page and refresh Twitch. Technical limitations and previous validation results are documented in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), currently in German.
 
-Ein unabhängiges Projekt ohne Verbindung zu Twitch, YouTube oder den jeweiligen Streamern.
+An independent project with no affiliation with Twitch, YouTube, or the respective streamers.
