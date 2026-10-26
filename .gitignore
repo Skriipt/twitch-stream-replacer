@@ -1,0 +1,15 @@
+# Local editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local dependencies, generated archives and private settings
+node_modules/
+dist/
+*.zip
+*.log
+.env
+.env.*
+!.env.example
