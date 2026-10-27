@@ -103,6 +103,8 @@ test("native audio guards leave unrelated media alone and release the original m
   const audio = preview.querySelector("audio");
   audio.muted = true;
   await p.click("watch");
+  p.window.document.body.append(native);
+  audio.remove();
   const unrelated = p.window.document.createElement("video");
   p.window.document.body.append(unrelated);
   for (const type of ["play", "playing", "volumechange"]) {
@@ -142,6 +144,22 @@ test("audio protection adds no timer or lookup between suspension and mounting Y
   p.window.document.querySelector("video").dispatchEvent(new p.window.Event("volumechange"));
   await flush();
   assert.equal(p.calls.length, messages, "audio enforcement makes no background request");
+});
+
+test("a preroll removed in the same DOM turn is tracked before deferred reconciliation", async (t) => {
+  const p = await page(t);
+  const audio = p.window.document.createElement("audio");
+  p.window.document.querySelector(".channel-root__player").append(audio);
+  audio.remove();
+  await flush();
+  assert.equal(p.paused, 0, "tracking does not interrupt Twitch before the switch");
+  await p.click("watch");
+  assert.equal(audio.muted, true, "removed media is included in the initial mute");
+  audio.muted = false;
+  audio.dispatchEvent(new p.window.Event("playing"));
+  assert.equal(audio.muted, true, "detached playback is still guarded");
+  await p.navigate("/directory");
+  assert.equal(audio.muted, false, "navigation restores the original mute state");
 });
 
 test("unknown/loading data blocks replacement and recovers when Twitch data arrives", async (t) => {
