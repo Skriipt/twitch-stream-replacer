@@ -3,7 +3,9 @@
   const CONFIG = globalThis.StylerzBridgeConfig;
   const ROOT_ID = "stylerz-bridge-prototype";
   const ACTIVE_ATTRIBUTE = "data-stream-bridge-active";
+  const PLAYER_SELECTOR = '.channel-root__player, [data-a-target="video-player"], .video-player';
   const PREVIEW_SELECTOR = ".picture-by-picture-player";
+  const MEDIA_EVENTS = ["play", "playing", "volumechange"];
   const RELOAD_MESSAGE = "Erweiterung bitte neu laden und Twitch aktualisieren.";
   // Twitch fills in the viewer's subscription data a moment after the player
   // mounts. Retry quickly while it is unknown instead of waiting for the slow poll.
@@ -45,6 +47,9 @@
   let routeStart = 0;
   let marks = {};
   const mutedVideos = new Map();
+  // Keep ownership when Twitch moves or detaches a preroll's media element.
+  // Its audio can outlive the player DOM, including before the first switch.
+  const nativeMedia = new Set();
 
   function isChannel() {
     return Boolean(CONFIG.channelForUrl(location.href));
@@ -212,12 +217,30 @@
   }
 
   function stopNativeVideos() {
-    if (!active) return;
-    mount?.querySelectorAll("video, audio").forEach(silence);
-    document.querySelectorAll(`${PREVIEW_SELECTOR} video, ${PREVIEW_SELECTOR} audio`).forEach(silence);
+    document.querySelectorAll(`${PLAYER_SELECTOR}, ${PREVIEW_SELECTOR}`).forEach(trackNativeMediaTree);
+    if (active) nativeMedia.forEach(silence);
+  }
+
+  function trackNativeMedia(media) {
+    if (nativeMedia.has(media)) return;
+    nativeMedia.add(media);
+    // Detached elements no longer send events through document. Listen on
+    // the source itself so Twitch cannot resume or unmute an orphaned ad.
+    for (const type of MEDIA_EVENTS) media.addEventListener(type, guardNativeAudio);
+    if (active) silence(media);
+  }
+
+  function trackNativeMediaTree(node) {
+    if (!(node instanceof Element)) return;
+    if (node instanceof HTMLMediaElement) trackNativeMedia(node);
+    node.querySelectorAll("video, audio").forEach(trackNativeMedia);
   }
 
   function restoreNativeVideos() {
+    for (const media of nativeMedia) {
+      for (const type of MEDIA_EVENTS) media.removeEventListener(type, guardNativeAudio);
+    }
+    nativeMedia.clear();
     for (const [video, muted] of mutedVideos) video.muted = muted;
     mutedVideos.clear();
   }
@@ -619,7 +642,7 @@
       if (!checking && !active && !switching && checkedLinks !== JSON.stringify(youtubeLinks())) void check(false);
       return;
     }
-    const player = document.querySelector('.channel-root__player, [data-a-target="video-player"], .video-player');
+    const player = document.querySelector(PLAYER_SELECTOR);
     if (!player) return;
     if (!root) createUI();
     releaseMount();
@@ -653,8 +676,19 @@
   }
 
   const observer = new MutationObserver((records) => {
+    const token = generation;
     routeChanged();
-    if (!isChannel()) return;
+    if (!isChannel() || token !== generation) return;
+    for (const record of records) {
+      // Remember media before the discovery debounce, even while Twitch is
+      // still playing. Removed subtrees may contain a running preroll too.
+      const inPlayer = record.target instanceof Element && record.target.closest(`${PLAYER_SELECTOR}, ${PREVIEW_SELECTOR}`);
+      for (const node of [...record.addedNodes, ...record.removedNodes]) {
+        if (!(node instanceof Element)) continue;
+        if (inPlayer || node.matches(`${PLAYER_SELECTOR}, ${PREVIEW_SELECTOR}`)) trackNativeMediaTree(node);
+        else node.querySelectorAll(`${PLAYER_SELECTOR}, ${PREVIEW_SELECTOR}`).forEach(trackNativeMediaTree);
+      }
+    }
     if (!active && !channel.channelId) schedule();
     if (!root?.isConnected || !mount?.isConnected ||
         (active && records.some((record) => mount.contains(record.target) ||
@@ -668,12 +702,15 @@
   });
   observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["href"] });
   function guardNativeAudio(event) {
-    if (active && event.target instanceof HTMLMediaElement &&
-        (mount?.contains(event.target) || event.target.closest(PREVIEW_SELECTOR))) silence(event.target);
+    const media = event.target;
+    if (!(media instanceof HTMLMediaElement) ||
+        !(nativeMedia.has(media) || media.closest(`${PLAYER_SELECTOR}, ${PREVIEW_SELECTOR}`))) return;
+    trackNativeMedia(media);
+    if (active) silence(media);
   }
   // Twitch can reapply volume after play, or finish resuming later. Media
   // properties do not trigger the DOM observer; catch their own events.
-  for (const type of ["play", "playing", "volumechange"]) document.addEventListener(type, guardNativeAudio, true);
+  for (const type of MEDIA_EVENTS) document.addEventListener(type, guardNativeAudio, true);
   window.addEventListener("message", (event) => {
     const frame = shadow?.getElementById("youtube");
     if (event.origin !== "https://www.youtube.com" || !frame || event.source !== frame.contentWindow) return;

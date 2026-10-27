@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.2
+
+### Fixed
+
+- Stop preroll audio after switching to YouTube even when Twitch moves or detaches its media element before the switch or tries to resume it afterward.
+
 ## 0.3.1
 
 ### Added

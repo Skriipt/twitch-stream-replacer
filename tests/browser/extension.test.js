@@ -182,6 +182,57 @@ test("loaded extension discovers late profile links, switches video and preserve
   await close(page);
 });
 
+for (const automatic of [false, true]) for (const destination of ["outside", "detached"]) test(`a native preroll moved ${destination} before ${automatic ? "automatic" : "manual"} switching cannot keep playing`, async () => {
+  await mockYouTube(routes());
+  const page = await open();
+  try {
+    const before = await page.evaluate(async () => {
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      const output = audioContext.createMediaStreamDestination();
+      oscillator.connect(output);
+      oscillator.start();
+      await audioContext.resume();
+      const audio = new Audio();
+      audio.srcObject = output.stream;
+      document.querySelector('.channel-root__player').append(audio);
+      await audio.play();
+      window.preroll = audio;
+      return { muted: audio.muted, paused: audio.paused };
+    });
+    assert.deepEqual(before, { muted: false, paused: false }, "the preroll starts before replacement");
+    const moved = await page.evaluate(async (destination) => {
+      if (destination === 'outside') document.body.append(window.preroll);
+      else {
+        const paused = new Promise((resolve) => window.preroll.addEventListener('pause', resolve, { once: true }));
+        window.preroll.remove();
+        await paused;
+      }
+      // Chromium may pause media on removal; Twitch can resume it through
+      // its retained reference without putting it back in the player DOM.
+      await window.preroll.play();
+      return { muted: window.preroll.muted, paused: window.preroll.paused };
+    }, destination);
+    assert.deepEqual(moved, { muted: false, paused: false }, "the moved preroll is still playing before replacement");
+    if (automatic) await worker.evaluate(() => chrome.storage.local.set({ autoSwitchToYouTube: true }));
+    await addLinks(page);
+    if (!automatic) await page.locator(`${root} #watch`).click();
+    await expect(page.locator(`${root} iframe`)).toBeVisible();
+    const after = await page.evaluate(() => ({ muted: window.preroll.muted, paused: window.preroll.paused }));
+    assert.deepEqual(after, { muted: true, paused: true }, "the original ad must stop even after its player moved or detached");
+    const resumed = await page.evaluate(async () => {
+      window.preroll.muted = false;
+      await window.preroll.play().catch(() => {});
+      return { muted: window.preroll.muted, paused: window.preroll.paused };
+    });
+    assert.deepEqual(resumed, { muted: true, paused: true }, "late ad updates must not bypass the guard outside the player DOM");
+    await expect(page.frameLocator(`${root} iframe`).locator("video")).toHaveJSProperty("muted", false);
+  } finally {
+    await close(page);
+    if (automatic) await worker.evaluate(() => chrome.storage.local.set({ autoSwitchToYouTube: false }));
+  }
+});
+
 for (const destination of ["player", "preview", "replacement"]) test(`native audio inserted into ${destination} is silenced before delayed reconciliation`, async () => {
   await mockYouTube(routes());
   const page = await open();
